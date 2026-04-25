@@ -122,7 +122,7 @@ export async function runStructuredSpatialCopilot(args: {
       setTimeout(resolve, 120);
     });
   }
-  return runSpatialCopilotFromParsed({
+  const spatialText = await runSpatialCopilotFromParsed({
     parsed,
     enabledLayers: args.enabledLayersForRun,
     allLayers: args.allLayers,
@@ -130,4 +130,7 @@ export async function runStructuredSpatialCopilot(args: {
     signal: args.signal,
     handlers: args.handlers,
   });
+  const lead = args.intent.simpleAnswer?.trim();
+  if (!lead) return spatialText;
+  return `${lead}\n\n${spatialText}`;
 }

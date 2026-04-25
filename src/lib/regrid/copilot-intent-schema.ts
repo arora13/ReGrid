@@ -11,9 +11,14 @@ export const copilotLlmIntentSchema = z.object({
     .optional(),
   mentionsWind: z.boolean().optional(),
   summary: z.string().max(500).optional(),
+  /** Short honest reply for the user (demo limits, what the map will do). */
+  simpleAnswer: z.string().max(700).optional(),
 });
 
 export type CopilotLlmIntent = z.infer<typeof copilotLlmIntentSchema>;
+
+const defaultSimpleAnswer =
+  "ReGrid will place a demo footprint in California and score it on the synthetic layers you have turned on. That score is illustrative only—not a permit study or real-world lowest-risk optimization.";
 
 export const CopilotStructuredIntentSchema = copilotLlmIntentSchema.transform((v) => ({
   acres: v.acres ?? 50,
@@ -23,6 +28,7 @@ export const CopilotStructuredIntentSchema = copilotLlmIntentSchema.transform((v
   layerFocus: v.layerFocus,
   mentionsWind: v.mentionsWind ?? false,
   summary: v.summary,
+  simpleAnswer: (v.simpleAnswer?.trim() || defaultSimpleAnswer).slice(0, 700),
 }));
 
 export type CopilotStructuredIntent = z.output<typeof CopilotStructuredIntentSchema>;
