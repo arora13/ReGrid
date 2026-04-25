@@ -4,10 +4,17 @@ import type { LayerDef, LayerId, ShapeKind } from "@/lib/regrid/types";
 import { ChevronDown, Circle, Hexagon, Square, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+export type ProjectKind = "solar" | "battery" | "grid-tied";
+
 interface LeftOperationsRailProps {
   layers: LayerDef[];
   enabledLayers: Set<LayerId>;
   onToggleLayer: (id: LayerId) => void;
+
+  projectKind: ProjectKind;
+  onProjectKindChange: (kind: ProjectKind) => void;
+  acreage: number;
+  onAcreageChange: (acres: number) => void;
 
   activeTool: ShapeKind | null;
   onSelectTool: (kind: ShapeKind) => void;
@@ -29,6 +36,10 @@ export function LeftOperationsRail({
   layers,
   enabledLayers,
   onToggleLayer,
+  projectKind,
+  onProjectKindChange,
+  acreage,
+  onAcreageChange,
   activeTool,
   onSelectTool,
   hasShape,
@@ -39,18 +50,26 @@ export function LeftOperationsRail({
   copilotRunning,
 }: LeftOperationsRailProps) {
   const busy = analysisState === "analyzing" || analysisState === "relocating" || copilotRunning;
-  const [layersOpen, setLayersOpen] = useState(true);
+  const [layersOpen, setLayersOpen] = useState(false);
 
   const enabledCount = useMemo(() => enabledLayers.size, [enabledLayers]);
+
+  const step = !hasShape
+    ? 1
+    : analysisState === "result"
+      ? 3
+      : analysisState === "analyzing" || analysisState === "relocating"
+        ? 2
+        : 2;
 
   return (
     <motion.aside
       initial={{ y: -10, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className="pointer-events-auto absolute top-8 left-8 z-20 w-[min(360px,calc(100vw-2rem))]"
+      className="pointer-events-auto absolute left-4 top-4 z-20 w-[min(360px,calc(100vw-1.5rem))] sm:left-8 sm:top-8 sm:w-[min(360px,calc(100vw-2rem))]"
     >
-      <div className="glass flex max-h-[calc(100vh-7.25rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] shadow-sm">
+      <div className="glass flex max-h-[calc(100%-2.25rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] shadow-sm">
         <div className="shrink-0 border-b border-white/[0.06] p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -61,7 +80,7 @@ export function LeftOperationsRail({
                 </span>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Map-first siting: place a footprint, score conflicts, then optimize.
+                A spatial decision console for clean energy siting.
               </p>
             </div>
 
@@ -76,11 +95,89 @@ export function LeftOperationsRail({
             </button>
           </div>
 
+          <div className="mt-4 rounded-xl border border-white/[0.06] bg-black/15 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-medium text-foreground/90">Workflow</p>
+              <p className="text-[10px] text-muted-foreground">Step {step} / 3</p>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-1">
+              {[
+                { n: 1, label: "Place" },
+                { n: 2, label: "Analyze" },
+                { n: 3, label: "Decide" },
+              ].map((s) => (
+                <div
+                  key={s.n}
+                  className={`rounded-lg px-2 py-1 text-center text-[10px] font-medium ${
+                    step === s.n ? "bg-white/[0.06] text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  {s.label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <p className="text-[11px] font-medium text-foreground/90">Mission</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">What are you siting?</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {(
+                [
+                  { id: "solar" as const, label: "Solar" },
+                  { id: "battery" as const, label: "Battery" },
+                  { id: "grid-tied" as const, label: "Grid-tied" },
+                ] as const
+              ).map((p) => {
+                const active = projectKind === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => onProjectKindChange(p.id)}
+                    disabled={busy}
+                    className={`rounded-xl border px-2 py-2 text-[11px] font-semibold transition ${
+                      active
+                        ? "border-sky-400/35 bg-sky-400/10 text-sky-100"
+                        : "border-white/10 bg-white/[0.02] text-muted-foreground hover:border-white/20 hover:text-foreground"
+                    } disabled:cursor-not-allowed disabled:opacity-40`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-medium text-foreground/90">Site size</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Approximate footprint area.
+                </p>
+              </div>
+              <p className="text-[10px] tabular-nums text-muted-foreground">{acreage} ac</p>
+            </div>
+            <input
+              type="range"
+              min={10}
+              max={500}
+              step={5}
+              value={acreage}
+              disabled={busy}
+              onChange={(e) => onAcreageChange(Number(e.target.value))}
+              className="mt-2 w-full accent-sky-400 disabled:opacity-40"
+            />
+          </div>
+
           <div className="mt-4">
             <div className="flex items-end justify-between gap-3">
               <div>
                 <p className="text-[11px] font-medium text-foreground/90">Footprint</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">Pick a tool, click the map.</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Pick a tool, click the map.
+                </p>
               </div>
               <p className="text-[10px] text-muted-foreground">{hasShape ? "Anchored" : "None"}</p>
             </div>
@@ -128,6 +225,9 @@ export function LeftOperationsRail({
                 {analysisState === "relocating" ? "Searching…" : "Find better site"}
               </button>
             </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+              After analysis, use Copilot for a guided search — or run a local optimization pass.
+            </p>
           </div>
         </div>
 

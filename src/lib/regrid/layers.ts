@@ -58,7 +58,7 @@ export const LAYERS: LayerDef[] = [
     id: "hifld-transmission",
     name: "HIFLD Electric Transmission Lines",
     agency: "DHS · HIFLD",
-    color: "#22d3ee",
+    color: "#38bdf8",
     geojson: {
       type: "FeatureCollection",
       features: [
@@ -78,7 +78,7 @@ export const LAYERS: LayerDef[] = [
     id: "eia-grid",
     name: "EIA Grid Infrastructure",
     agency: "U.S. Energy Information Admin.",
-    color: "#a78bfa",
+    color: "#60a5fa",
     geojson: {
       type: "FeatureCollection",
       features: [
@@ -92,7 +92,7 @@ export const LAYERS: LayerDef[] = [
     id: "usda-wildfire",
     name: "USDA Wildfire Risk Zones",
     agency: "USDA Forest Service",
-    color: "#f97316",
+    color: "#fb923c",
     geojson: {
       type: "FeatureCollection",
       features: [
@@ -111,7 +111,7 @@ export const LAYERS: LayerDef[] = [
     id: "epa-ejscreen",
     name: "EPA EJScreen Disadvantaged Communities",
     agency: "EPA EJScreen",
-    color: "#f43f5e",
+    color: "#c4b5fd",
     geojson: {
       type: "FeatureCollection",
       features: [

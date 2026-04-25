@@ -6,17 +6,14 @@ import { SpatialCopilot } from "@/components/regrid/SpatialCopilot";
 import { LeftOperationsRail } from "@/components/regrid/LeftOperationsRail";
 import { RiskScoreHUD } from "@/components/regrid/RiskScoreHUD";
 import { LAYERS } from "@/lib/regrid/layers";
-import { buildShape } from "@/lib/regrid/geo";
+import { buildShape, distanceMeters } from "@/lib/regrid/geo";
 import { analyzeShape, findOptimalRelocation } from "@/lib/regrid/analyze";
 import { getPublicMapboxTokenFromEnv } from "@/lib/regrid/env";
-import type {
-  AnalysisResult,
-  DrawnShape,
-  LayerId,
-  ShapeKind,
-} from "@/lib/regrid/types";
+import type { AnalysisResult, Conflict, DrawnShape, LayerId, ShapeKind } from "@/lib/regrid/types";
 
 export const Route = createFileRoute("/")({
+  // Mapbox/WebGL must not run during SSR — avoids blank maps after hydration.
+  ssr: false,
   head: () => ({
     meta: [
       { title: "ReGrid · Spatial Intelligence for Clean Energy Siting" },
@@ -39,6 +36,26 @@ export const Route = createFileRoute("/")({
 const TOKEN_KEY = "regrid:mapbox-token";
 type AnalysisState = "idle" | "analyzing" | "result" | "relocating";
 
+type ProjectKind = "solar" | "battery" | "grid-tied";
+
+function acresToRadiusMeters(acres: number) {
+  const a = Math.max(1, acres);
+  return Math.sqrt((a * 4046.8564224) / Math.PI);
+}
+
+function summarizeAvoided(before: Conflict[] | null, after: Conflict[] | null): string | null {
+  if (!before?.length) return null;
+  const afterLabels = new Set((after ?? []).map((c) => c.label));
+  const removed = before.find((c) => !afterLabels.has(c.label));
+  if (!removed) return null;
+  if (removed.layerId === "usda-wildfire") return "Wildfire exposure reduced materially.";
+  if (removed.layerId === "epa-ejscreen") return "Equity-priority overlap avoided.";
+  if (removed.layerId === "hifld-transmission" || removed.layerId === "eia-grid") {
+    return "Major grid conflict removed (check corridor proximity).";
+  }
+  return "Top conflict driver changed — review map highlights.";
+}
+
 function RegridApp() {
   const [token, setToken] = useState<string | null>(null);
   useEffect(() => {
@@ -54,29 +71,45 @@ function RegridApp() {
   const [enabledLayers, setEnabledLayers] = useState<Set<LayerId>>(
     () => new Set<LayerId>(["hifld-transmission", "usda-wildfire", "epa-ejscreen"]),
   );
+  const [projectKind, setProjectKind] = useState<ProjectKind>("solar");
+  const [acreage, setAcreage] = useState(50);
   const [activeTool, setActiveTool] = useState<ShapeKind | null>("circle");
   const [shape, setShape] = useState<DrawnShape | null>(null);
+  const [ghostShape, setGhostShape] = useState<DrawnShape | null>(null);
+  const [shapePulse, setShapePulse] = useState(false);
   const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [highlightedConflict, setHighlightedConflict] = useState<LayerId | null>(null);
   const [copilotRunning, setCopilotRunning] = useState(false);
   const [relocateSuccess, setRelocateSuccess] = useState(false);
+  const [compare, setCompare] = useState<{
+    beforeScore: number | null;
+    afterScore: number | null;
+    movedKm: number | null;
+    headline: string | null;
+  }>({ beforeScore: null, afterScore: null, movedKm: null, headline: null });
   const prevScoreRef = useRef<number | null>(null);
   const relocateArmedRef = useRef(false);
+  const ghostTimerRef = useRef<number | null>(null);
+  const pulseTimerRef = useRef<number | null>(null);
 
   const flyToRef = useRef<(c: [number, number], z?: number) => void>(() => {});
 
-  const radiusForKind = (kind: ShapeKind) =>
-    kind === "circle" ? 6500 : kind === "square" ? 6800 : 7200;
+  const radiusMeters = useMemo(() => acresToRadiusMeters(acreage), [acreage]);
 
   const handleMapClick = (lngLat: [number, number]) => {
     if (copilotRunning) return;
     if (!activeTool) return;
     const id = `shape-${Date.now()}`;
-    const next = buildShape(activeTool, lngLat, radiusForKind(activeTool), id);
+    const next = buildShape(activeTool, lngLat, radiusMeters, id);
     setShape(next);
+    setGhostShape(null);
+    setShapePulse(true);
+    if (pulseTimerRef.current) window.clearTimeout(pulseTimerRef.current);
+    pulseTimerRef.current = window.setTimeout(() => setShapePulse(false), 2400);
     setResult(null);
     setAnalysisState("idle");
+    setCompare({ beforeScore: null, afterScore: null, movedKm: null, headline: null });
     flyToRef.current(lngLat, Math.max(8.4, 8.4));
   };
 
@@ -110,7 +143,10 @@ function RegridApp() {
     relocateArmedRef.current = true;
     prevScoreRef.current = result?.score ?? null;
     setRelocateSuccess(false);
+    setGhostShape(shape);
     setTimeout(() => {
+      const beforeCenter = shape.center;
+      const beforeConflicts = result?.conflicts ?? null;
       const { center, result: newResult } = findOptimalRelocation(shape, enabledLayers);
       flyToRef.current(center, 9.2);
       setTimeout(() => {
@@ -118,18 +154,40 @@ function RegridApp() {
         setShape(newShape);
         setResult(newResult);
         setAnalysisState("result");
+        setShapePulse(true);
+        if (pulseTimerRef.current) window.clearTimeout(pulseTimerRef.current);
+        pulseTimerRef.current = window.setTimeout(() => setShapePulse(false), 2600);
+
+        const movedKm = distanceMeters(beforeCenter, center) / 1000;
+        const headline = summarizeAvoided(beforeConflicts, newResult.conflicts);
+        setCompare({
+          beforeScore: prevScoreRef.current,
+          afterScore: newResult.score,
+          movedKm,
+          headline,
+        });
+
+        if (ghostTimerRef.current) window.clearTimeout(ghostTimerRef.current);
+        ghostTimerRef.current = window.setTimeout(() => setGhostShape(null), 6500);
       }, 900);
     }, 1600);
   };
 
   const handleClear = () => {
     setShape(null);
+    setGhostShape(null);
+    setShapePulse(false);
     setResult(null);
     setAnalysisState("idle");
     setHighlightedConflict(null);
     setRelocateSuccess(false);
     relocateArmedRef.current = false;
     prevScoreRef.current = null;
+    setCompare({ beforeScore: null, afterScore: null, movedKm: null, headline: null });
+    if (ghostTimerRef.current) window.clearTimeout(ghostTimerRef.current);
+    if (pulseTimerRef.current) window.clearTimeout(pulseTimerRef.current);
+    ghostTimerRef.current = null;
+    pulseTimerRef.current = null;
   };
 
   const layers = useMemo(() => LAYERS, []);
@@ -141,7 +199,7 @@ function RegridApp() {
     const after = result.score;
     if (before !== null && after < before) {
       setRelocateSuccess(true);
-      const t = window.setTimeout(() => setRelocateSuccess(false), 3800);
+      const t = window.setTimeout(() => setRelocateSuccess(false), 5200);
       relocateArmedRef.current = false;
       return () => window.clearTimeout(t);
     }
@@ -161,50 +219,61 @@ function RegridApp() {
   }
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-background">
-      <MapCanvas
-        token={token}
-        layers={layers}
-        enabledLayers={enabledLayers}
-        shape={shape}
-        highlightedConflict={highlightedConflict}
-        crosshair={!!activeTool && !copilotRunning}
-        onMapClick={handleMapClick}
-        onMapReady={(fly) => {
-          flyToRef.current = fly;
-        }}
-      />
+    <div className="fixed inset-0 z-0 flex flex-col overflow-hidden bg-background ring-1 ring-inset ring-white/[0.06]">
+      <div className="relative min-h-0 min-w-0 flex-1">
+        <div className="absolute inset-0 z-0 min-h-0 min-w-0">
+          <MapCanvas
+            token={token}
+            layers={layers}
+            enabledLayers={enabledLayers}
+            shape={shape}
+            ghostShape={ghostShape}
+            shapePulse={shapePulse}
+            highlightedConflict={highlightedConflict}
+            crosshair={!!activeTool && !copilotRunning}
+            onMapClick={handleMapClick}
+            onMapReady={(fly) => {
+              flyToRef.current = fly;
+            }}
+          />
+        </div>
 
-      {/* Subtle vignette + grid for depth */}
-      <div
-        className="pointer-events-none absolute inset-0 z-10"
-        style={{
-          background:
-            "radial-gradient(ellipse at center, transparent 62%, oklch(0.1 0.02 240 / 0.34) 100%)",
-        }}
-      />
+        <LeftOperationsRail
+          layers={layers}
+          enabledLayers={enabledLayers}
+          onToggleLayer={handleToggleLayer}
+          projectKind={projectKind}
+          onProjectKindChange={setProjectKind}
+          acreage={acreage}
+          onAcreageChange={setAcreage}
+          activeTool={activeTool}
+          onSelectTool={setActiveTool}
+          hasShape={!!shape}
+          onAnalyze={handleAnalyze}
+          onFindBetterSite={handleRelocate}
+          onClear={handleClear}
+          analysisState={analysisState}
+          copilotRunning={copilotRunning}
+        />
 
-      <LeftOperationsRail
-        layers={layers}
-        enabledLayers={enabledLayers}
-        onToggleLayer={handleToggleLayer}
-        activeTool={activeTool}
-        onSelectTool={setActiveTool}
-        hasShape={!!shape}
-        onAnalyze={handleAnalyze}
-        onFindBetterSite={handleRelocate}
-        onClear={handleClear}
-        analysisState={analysisState}
-        copilotRunning={copilotRunning}
-      />
+        <RiskScoreHUD
+          hasShape={!!shape}
+          analysisState={analysisState}
+          result={result}
+          onHoverConflict={setHighlightedConflict}
+          relocateSuccess={relocateSuccess}
+          compare={compare}
+        />
 
-      <RiskScoreHUD
-        hasShape={!!shape}
-        analysisState={analysisState}
-        result={result}
-        onHoverConflict={setHighlightedConflict}
-        relocateSuccess={relocateSuccess}
-      />
+        {import.meta.env.DEV ? (
+          <div
+            className="pointer-events-none absolute bottom-3 right-3 z-[80] max-w-[min(100vw-1rem,280px)] rounded-md border border-emerald-500/25 bg-black/75 px-2 py-1 font-mono text-[10px] text-emerald-200/90 shadow-sm"
+            title="If this badge never updates after a code change, restart dev with npm run dev:fresh."
+          >
+            REGRID_DEV · shell-20260426b · flex+dock+map-poll
+          </div>
+        ) : null}
+      </div>
 
       <SpatialCopilot
         enabledLayers={enabledLayers}

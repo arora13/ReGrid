@@ -107,19 +107,19 @@ export async function runSpatialCopilotDemo(args: {
   const acres = parsed.acres ?? 50;
   const radiusMeters = acresToRadiusMeters(acres);
 
-  onLog("> mission: interpret natural language constraints");
+  onLog("receipt · mission_received");
   await delay(220, signal);
   onLog(
-    `> parsed: ${acres.toFixed(0)} acres · max risk ${maxRisk} · layers: ${
+    `receipt · constraints_parsed · acres=${acres.toFixed(0)} · max_risk=${maxRisk} · focus=${
       parsed.wantsTransmission ? "transmission " : ""
-    }${parsed.wantsWildfire ? "wildfire " : ""}${parsed.wantsEJ ? "ejscreen " : ""}${parsed.wantsGrid ? "grid " : ""}`.trim(),
+    }${parsed.wantsWildfire ? "wildfire " : ""}${parsed.wantsEJ ? "equity " : ""}${parsed.wantsGrid ? "grid " : ""}`.trim(),
   );
   await delay(220, signal);
 
   const enabled = new Set<LayerId>(userEnabled);
   for (const id of defaultEnabledLayers(parsed)) enabled.add(id);
 
-  onLog("> tool: calculate_site_risk(center, footprint, active_layers)");
+  onLog("tool · calculate_site_risk { footprint, active_layers }");
   await delay(260, signal);
 
   let center = pickInitialCenter(parsed);
@@ -130,7 +130,7 @@ export async function runSpatialCopilotDemo(args: {
     onShape(shape);
     const result = analyzeShape(shape, enabled);
     onAnalysis(result);
-    onLog(`> ${label}: risk=${result.score} · ${summarizeConflicts(result)}`);
+    onLog(`result · ${label} · risk=${result.score} · ${summarizeConflicts(result)}`);
     return { shape, result };
   };
 
@@ -138,40 +138,40 @@ export async function runSpatialCopilotDemo(args: {
   await delay(320, signal);
 
   if (result.score <= maxRisk) {
-    onLog("> decision: seed site satisfies risk budget — finalize");
+    onLog("decision · seed_within_budget");
     await delay(220, signal);
-    onLog("> action: lock footprint + publish candidate");
+    onLog("action · publish_candidate");
     return;
   }
 
   const worst = result.conflicts.find((c) => c.severity === "high") ?? result.conflicts[0];
   if (worst?.layerId === "usda-wildfire") {
-    onLog("> reasoning: high wildfire exposure — shift search west along conflict gradient");
+    onLog("analysis · high_wildfire_exposure → shift_west");
     await delay(280, signal);
     center = [center[0] - 0.12, center[1] + 0.01];
     onFly(center, 9.0);
     ({ shape, result } = runEvaluate("evaluate #2 (west shift)"));
     await delay(320, signal);
   } else if (worst?.layerId === "hifld-transmission" || parsed.wantsTransmission) {
-    onLog("> reasoning: corridor proximity is acceptable, but score still high — micro-adjust footprint anchor");
+    onLog("analysis · transmission_proximity_ok → micro_adjust_anchor");
     await delay(260, signal);
     center = [center[0] - 0.04, center[1] + 0.06];
     onFly(center, 9.0);
     ({ shape, result } = runEvaluate("evaluate #2 (micro-adjust)"));
     await delay(320, signal);
   } else {
-    onLog("> reasoning: score above budget — run bounded relocation search");
+    onLog("analysis · score_above_budget → bounded_search");
     await delay(260, signal);
   }
 
   if (result.score <= maxRisk) {
-    onLog("> decision: post-adjustment site clears budget — finalize");
+    onLog("decision · post_adjustment_within_budget");
     await delay(220, signal);
-    onLog("> action: lock footprint + publish candidate");
+    onLog("action · publish_candidate");
     return;
   }
 
-  onLog("> tool: grid_search_relocate(shape, max_radius_km=30, step=30deg)");
+  onLog("tool · grid_search_relocate { radius_km: 30, step_deg: 30 }");
   await delay(320, signal);
   const relocated = findOptimalRelocation(shape, enabled);
   center = relocated.center;
@@ -180,17 +180,17 @@ export async function runSpatialCopilotDemo(args: {
   onShape(finalShape);
   let finalResult = relocated.result;
 
-  onLog(`> evaluate #3 (grid search): risk=${finalResult.score} · ${summarizeConflicts(finalResult)}`);
+  onLog(`result · grid_search_best · risk=${finalResult.score} · ${summarizeConflicts(finalResult)}`);
   await delay(320, signal);
 
   if (finalResult.score > maxRisk) {
-    onLog("> decision: enforce user risk ceiling for demo (clamp + clear conflicts)");
+    onLog("decision · enforce_user_risk_ceiling (demo clamp)");
     await delay(220, signal);
     finalResult = { score: Math.max(0, maxRisk - 3), conflicts: [] };
     onAnalysis(finalResult);
   }
 
-  onLog("> finalize: candidate meets mission constraints");
+  onLog("decision · candidate_selected");
   await delay(200, signal);
-  onLog("> ui: fly camera + render footprint (big reveal)");
+  onLog("ui · fly_to_candidate + render_footprint");
 }

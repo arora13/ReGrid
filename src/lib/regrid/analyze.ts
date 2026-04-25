@@ -30,20 +30,20 @@ function polygonCentroid(coords: number[][]): [number, number] {
 
 const LAYER_LABELS: Record<LayerId, { hit: string; near: string }> = {
   "hifld-transmission": {
-    hit: "Intersects HIFLD Transmission Corridor",
-    near: "Proximity to Transmission Lines",
+    hit: "Transmission corridor overlap",
+    near: "Close to high-voltage transmission",
   },
   "eia-grid": {
-    hit: "Overlaps EIA Substation / Switchyard",
-    near: "Proximity to Grid Infrastructure",
+    hit: "Grid infrastructure overlap",
+    near: "Near substation / switchyard footprint",
   },
   "usda-wildfire": {
-    hit: "Intersects USDA Wildfire Risk Zone",
-    near: "Adjacent to Wildfire Risk Buffer",
+    hit: "High wildfire exposure overlap",
+    near: "Wildfire risk within buffer distance",
   },
   "epa-ejscreen": {
-    hit: "Sited within EPA EJScreen Disadvantaged Community",
-    near: "Within EJScreen 5km Engagement Buffer",
+    hit: "Equity-priority area overlap",
+    near: "Equity-priority area nearby (buffer)",
   },
 };
 
@@ -84,7 +84,7 @@ export function analyzeShape(
           label: LAYER_LABELS[layer.id].hit,
           severity: layer.id === "usda-wildfire" || layer.id === "epa-ejscreen" ? "high" : "medium",
           layerId: layer.id,
-          detail: `${(f.properties as Record<string, string>)?.name ?? "Feature"} · direct overlap`,
+          detail: `${(f.properties as Record<string, string>)?.name ?? "Selected area"} — overlap`,
         });
         score += layer.id === "usda-wildfire" ? 32 : layer.id === "epa-ejscreen" ? 28 : 18;
       } else if (dist < buffer) {
@@ -93,7 +93,7 @@ export function analyzeShape(
           label: LAYER_LABELS[layer.id].near,
           severity: dist < buffer / 2 ? "medium" : "low",
           layerId: layer.id,
-          detail: `${(f.properties as Record<string, string>)?.name ?? "Feature"} · ${(dist / 1000).toFixed(1)} km away`,
+          detail: `${(f.properties as Record<string, string>)?.name ?? "Nearby feature"} — ${(dist / 1000).toFixed(1)} km away`,
         });
         score += layer.id === "hifld-transmission" ? 6 : 10;
       }

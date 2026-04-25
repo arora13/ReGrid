@@ -25,7 +25,7 @@ export function SpatialCopilot({
   const [command, setCommand] = useState(
     "Find me a 50 acre site near a transmission line in California with a risk score under 20.",
   );
-  const [log, setLog] = useState<string[]>(["> Ready. Ask for a site constraint, or run the sample mission."]);
+  const [log, setLog] = useState<string[]>(["system · copilot_ready · bounded_tool_loop=true"]);
   const [running, setRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -42,6 +42,15 @@ export function SpatialCopilot({
 
   const append = (line: string) => setLog((prev) => [...prev.slice(-220), line]);
 
+  const MISSION_CHIPS = useMemo(
+    () => [
+      "50 acres near transmission in CA, risk under 20",
+      "Battery site: avoid wildfire + EJ overlap, risk under 25",
+      "Grid-tied solar: prioritize transmission access, risk under 35",
+    ],
+    [],
+  );
+
   const handleRun = async () => {
     if (!canRun) return;
     abortRef.current?.abort();
@@ -50,7 +59,7 @@ export function SpatialCopilot({
 
     setRunning(true);
     setOpen(true);
-    append("> ─ run start ─");
+    append("run · start");
     try {
       await runSpatialCopilotDemo({
         command,
@@ -64,14 +73,14 @@ export function SpatialCopilot({
           onAnalysis: onApplyAnalysis,
         },
       });
-      append("> ─ run complete ─");
+      append("run · complete");
     } catch (e) {
       const err = e as { name?: string };
       if (err?.name === "AbortError") {
-        append("> aborted");
+        append("run · aborted");
       } else {
-        append("> error: copilot run failed (see console)");
-        // eslint-disable-next-line no-console
+        append("run · error (see console)");
+
         console.error(e);
       }
     } finally {
@@ -84,13 +93,18 @@ export function SpatialCopilot({
   };
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-8 z-30 flex justify-center px-8">
-      <div className="pointer-events-auto w-full max-w-[920px]">
-        <motion.div layout className="glass overflow-hidden rounded-2xl border border-white/[0.08] shadow-sm">
+    <div className="pointer-events-none z-30 shrink-0 border-t border-white/[0.08] bg-gradient-to-t from-background via-background/95 to-background/80 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
+      <div className="pointer-events-auto mx-auto w-full max-w-[920px] px-1 sm:px-2">
+        <motion.div
+          layout
+          className="glass overflow-hidden rounded-2xl border border-white/[0.08] shadow-sm"
+        >
           <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-2.5">
             <div className="min-w-0">
               <p className="text-[12px] font-semibold text-foreground/95">Spatial copilot</p>
-              <p className="truncate text-[11px] text-muted-foreground">Natural language mission control</p>
+              <p className="truncate text-[11px] text-muted-foreground">
+                Command bar · tool receipts · bounded search
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -99,7 +113,11 @@ export function SpatialCopilot({
                 className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground/90 transition hover:border-white/20 hover:bg-white/[0.05]"
               >
                 Trace
-                {open ? <ChevronUp className="h-3.5 w-3.5 opacity-70" /> : <ChevronDown className="h-3.5 w-3.5 opacity-70" />}
+                {open ? (
+                  <ChevronUp className="h-3.5 w-3.5 opacity-70" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                )}
               </button>
               <button
                 type="button"
@@ -157,6 +175,25 @@ export function SpatialCopilot({
               </button>
             </div>
           </form>
+
+          <div className="border-t border-white/[0.06] px-3 pb-3 pt-2">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Suggested missions
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {MISSION_CHIPS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  disabled={running}
+                  onClick={() => setCommand(c)}
+                  className="max-w-full rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] text-foreground/90 transition hover:border-white/20 hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <span className="block max-w-[520px] truncate">{c}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </motion.div>
       </div>
     </div>

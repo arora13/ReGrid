@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo } from "react";
-import type { Conflict, LayerId } from "@/lib/regrid/types";
+import type { AnalysisResult, Conflict, LayerId } from "@/lib/regrid/types";
 
 interface RiskScoreHUDProps {
   hasShape: boolean;
@@ -8,6 +8,12 @@ interface RiskScoreHUDProps {
   result: AnalysisResult | null;
   onHoverConflict: (id: LayerId | null) => void;
   relocateSuccess: boolean;
+  compare: {
+    beforeScore: number | null;
+    afterScore: number | null;
+    movedKm: number | null;
+    headline: string | null;
+  };
 }
 
 function riskTone(score: number | null): "empty" | "good" | "caution" | "bad" {
@@ -18,8 +24,8 @@ function riskTone(score: number | null): "empty" | "good" | "caution" | "bad" {
 }
 
 function layerAccent(layerId: LayerId): string {
-  if (layerId === "hifld-transmission" || layerId === "eia-grid") return "#22d3ee"; // cyan/blue
-  if (layerId === "epa-ejscreen") return "#a78bfa"; // purple
+  if (layerId === "hifld-transmission" || layerId === "eia-grid") return "#38bdf8"; // cyan/blue
+  if (layerId === "epa-ejscreen") return "#c4b5fd"; // purple
   if (layerId === "usda-wildfire") return "#fb923c"; // orange
   return "#94a3b8";
 }
@@ -27,7 +33,14 @@ function layerAccent(layerId: LayerId): string {
 function severityAccent(sev: Conflict["severity"]): string {
   if (sev === "high") return "#f87171";
   if (sev === "medium") return "#fbbf24";
-  return "#60a5fa";
+  return "#94a3b8";
+}
+
+function riskLabel(score: number | null): string {
+  if (score === null) return "—";
+  if (score >= 60) return "High";
+  if (score >= 30) return "Moderate";
+  return "Low";
 }
 
 export function RiskScoreHUD({
@@ -36,15 +49,34 @@ export function RiskScoreHUD({
   result,
   onHoverConflict,
   relocateSuccess,
+  compare,
 }: RiskScoreHUDProps) {
   const score = result?.score ?? null;
   const tone = riskTone(score);
-  const conflicts = useMemo(() => result?.conflicts?.slice(0, 5) ?? [], [result]);
+  const conflicts = useMemo(() => result?.conflicts?.slice(0, 3) ?? [], [result]);
 
   const ringColor =
     tone === "bad" ? "#f87171" : tone === "caution" ? "#fbbf24" : tone === "good" ? "#34d399" : "oklch(1 0 0 / 0.10)";
 
   const pct = score === null ? 0 : Math.max(0, Math.min(100, score));
+  const dormant = !hasShape && analysisState === "idle" && !result;
+
+  const nextAction =
+    !hasShape && analysisState === "idle"
+      ? "Place a footprint to begin analysis."
+      : hasShape && analysisState === "idle" && !result
+        ? "Run Analyze site to generate a risk score."
+        : analysisState === "analyzing"
+          ? "Computing intersections and buffers…"
+          : analysisState === "relocating"
+            ? "Searching nearby candidates while preserving constraints…"
+            : analysisState === "result" && result
+              ? tone === "bad"
+                ? "Try Find better site or run Copilot with a tighter risk ceiling."
+                : tone === "caution"
+                  ? "Review the top drivers, then optimize if you need more margin."
+                  : "Strong candidate — document assumptions and proceed to diligence."
+              : "—";
 
   return (
     <motion.aside
@@ -53,10 +85,14 @@ export function RiskScoreHUD({
       transition={{ duration: 0.35, ease: "easeOut", delay: 0.05 }}
       className="pointer-events-auto absolute top-8 right-8 z-20 w-[min(340px,calc(100vw-2rem))]"
     >
-      <div className="glass flex max-h-[calc(100vh-7.25rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] p-4 shadow-sm">
+      <div
+        className={`glass flex max-h-[calc(100vh-7.25rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] p-4 shadow-sm transition ${
+          dormant ? "opacity-70" : "opacity-100"
+        }`}
+      >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-medium text-foreground/90">Risk</p>
+            <p className="text-[11px] font-medium text-foreground/90">Risk intelligence</p>
             <p className="text-[11px] text-muted-foreground">Lower is better</p>
           </div>
           <div className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
@@ -95,19 +131,23 @@ export function RiskScoreHUD({
           </div>
 
           <div className="min-w-0 flex-1">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-sm font-semibold text-foreground/95">{riskLabel(score)} risk</p>
+              <p className="text-[10px] text-muted-foreground tabular-nums">{score === null ? "" : `score ${score}`}</p>
+            </div>
             {!hasShape && (
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                Select a footprint tool and click the map to anchor a site.
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                Place a project footprint to begin analysis.
               </p>
             )}
             {hasShape && analysisState === "idle" && !result && (
-              <p className="text-sm leading-relaxed text-muted-foreground">
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 Ready to score this footprint against active layers.
               </p>
             )}
             {analysisState === "analyzing" && (
               <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground/90">Analyzing…</p>
+                <p className="mt-2 text-sm font-medium text-foreground/90">Spatial scoring…</p>
                 <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
                   <motion.div
                     className="h-full bg-primary"
@@ -116,12 +156,16 @@ export function RiskScoreHUD({
                     transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }}
                   />
                 </div>
-                <p className="text-[11px] text-muted-foreground">Overlap checks, proximity buffers, scoring…</p>
+                <div className="space-y-1 text-[11px] text-muted-foreground">
+                  <p>Scanning transmission proximity…</p>
+                  <p>Checking wildfire exposure…</p>
+                  <p>Intersecting equity-priority areas…</p>
+                </div>
               </div>
             )}
             {analysisState === "relocating" && (
               <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground/90">Finding a better site…</p>
+                <p className="mt-2 text-sm font-medium text-foreground/90">Searching candidates…</p>
                 <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
                   <motion.div
                     className="h-full bg-sky-400/70"
@@ -130,19 +174,27 @@ export function RiskScoreHUD({
                     transition={{ duration: 0.95, repeat: Infinity, ease: "linear" }}
                   />
                 </div>
-                <p className="text-[11px] text-muted-foreground">Searching nearby candidates…</p>
+                <div className="space-y-1 text-[11px] text-muted-foreground">
+                  <p>Scoring candidate grid…</p>
+                  <p>Preserving corridor access where possible…</p>
+                </div>
               </div>
             )}
             {analysisState === "result" && result && (
               <div>
-                <p className="text-sm font-medium text-foreground/90">
+                <p className="mt-2 text-sm font-medium text-foreground/90">
                   {tone === "bad" ? "High conflict pressure" : tone === "caution" ? "Manageable risk" : "Strong candidate"}
                 </p>
                 <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                  {conflicts.length ? "Top conflicts (hover to highlight on map)" : "No conflicts detected on active layers."}
+                  {conflicts.length ? "Top drivers (hover to highlight on map)" : "No conflicts detected on active layers."}
                 </p>
               </div>
             )}
+
+            <div className="mt-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Next</p>
+              <p className="mt-1 text-[12px] leading-snug text-foreground/90">{nextAction}</p>
+            </div>
           </div>
         </div>
 
@@ -160,9 +212,22 @@ export function RiskScoreHUD({
           )}
         </AnimatePresence>
 
+        {compare.beforeScore !== null && compare.afterScore !== null && (
+          <div className="mt-3 rounded-xl border border-white/[0.06] bg-black/20 px-3 py-2">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Comparison</p>
+            <p className="mt-1 text-[12px] font-semibold text-foreground/95">
+              Risk {compare.beforeScore} → {compare.afterScore}
+              {compare.movedKm !== null ? (
+                <span className="text-[12px] font-medium text-muted-foreground"> · moved {compare.movedKm.toFixed(1)} km</span>
+              ) : null}
+            </p>
+            {compare.headline && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{compare.headline}</p>}
+          </div>
+        )}
+
         {analysisState === "result" && result && conflicts.length > 0 && (
           <div className="mt-4 min-h-0 flex-1 border-t border-white/[0.06] pt-3">
-            <p className="text-[11px] font-medium text-foreground/90">Conflicts</p>
+            <p className="text-[11px] font-medium text-foreground/90">Top drivers</p>
             <div className="mt-2 max-h-[34vh] space-y-1.5 overflow-y-auto pr-1 sm:max-h-[38vh]">
               {conflicts.map((c) => (
                 <button
