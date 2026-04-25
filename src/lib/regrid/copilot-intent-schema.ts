@@ -10,7 +10,7 @@ export const copilotLlmIntentSchema = z.object({
     .array(z.enum(["transmission", "wildfire", "equity", "grid", "power_plants"]))
     .optional(),
   mentionsWind: z.boolean().optional(),
-  summary: z.string().max(500).optional(),
+  summary: z.string().max(200).optional(),
   /** Short honest reply for the user (demo limits, what the map will do). */
   simpleAnswer: z.string().max(700).optional(),
 });
@@ -34,7 +34,8 @@ export const CopilotStructuredIntentSchema = copilotLlmIntentSchema.transform((v
 export type CopilotStructuredIntent = z.output<typeof CopilotStructuredIntentSchema>;
 
 export const copilotIntentRequestSchema = z.object({
-  command: z.string().min(1).max(4000),
+  /** Kept small to limit prompt size and cost. */
+  command: z.string().min(1).max(1000),
 });
 
 export type CopilotIntentRequest = z.infer<typeof copilotIntentRequestSchema>;

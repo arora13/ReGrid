@@ -58,6 +58,9 @@ export function SpatialCopilot({
   const [tutorialDismissed, setTutorialDismissed] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  /** Avoid rapid-fire Anthropic calls from double submits (client-side spend guard). */
+  const lastAnthropicAttemptRef = useRef(0);
+  const ANTHROPIC_CLIENT_COOLDOWN_MS = 3200;
 
   useEffect(() => {
     try {
@@ -99,31 +102,9 @@ export function SpatialCopilot({
       const trimmed = command.trim();
       let summary: string;
       try {
-        const intentRes = await parseCopilotIntentFn({
-          data: { command: trimmed },
-          signal: ac.signal,
-        });
-        if (intentRes.ok) {
-          const nextEnabled = enabledSetFromIntentFocus(intentRes.intent, allLayers, enabledLayers);
-          onApplyEnabledLayers?.(nextEnabled);
-          append("llm · intent_ok");
-          summary = await runStructuredSpatialCopilot({
-            command: trimmed,
-            intent: intentRes.intent,
-            enabledLayersForRun: nextEnabled,
-            allLayers,
-            shapeKind,
-            mapboxToken,
-            signal: ac.signal,
-            handlers: {
-              onLog: append,
-              onFly: flyTo,
-              onShape: onApplyShape,
-              onAnalysis: onApplyAnalysis,
-            },
-          });
-        } else {
-          append(`llm · ${intentRes.code} · fallback_regex`);
+        const now = Date.now();
+        if (now - lastAnthropicAttemptRef.current < ANTHROPIC_CLIENT_COOLDOWN_MS) {
+          append("client · llm_cooldown · fallback_regex");
           summary = await runSpatialCopilotDemo({
             command: trimmed,
             enabledLayers,
@@ -137,6 +118,55 @@ export function SpatialCopilot({
               onAnalysis: onApplyAnalysis,
             },
           });
+        } else {
+          lastAnthropicAttemptRef.current = now;
+          const intentRes = await parseCopilotIntentFn({
+            data: { command: trimmed },
+            signal: ac.signal,
+          });
+          if (intentRes.ok) {
+            const nextEnabled = enabledSetFromIntentFocus(
+              intentRes.intent,
+              allLayers,
+              enabledLayers,
+            );
+            onApplyEnabledLayers?.(nextEnabled);
+            append("llm · intent_ok");
+            summary = await runStructuredSpatialCopilot({
+              command: trimmed,
+              intent: intentRes.intent,
+              enabledLayersForRun: nextEnabled,
+              allLayers,
+              shapeKind,
+              mapboxToken,
+              signal: ac.signal,
+              handlers: {
+                onLog: append,
+                onFly: flyTo,
+                onShape: onApplyShape,
+                onAnalysis: onApplyAnalysis,
+              },
+            });
+          } else {
+            const extra =
+              intentRes.code === "rate_limited" && intentRes.retryAfterSec
+                ? ` (retry ~${intentRes.retryAfterSec}s)`
+                : "";
+            append(`llm · ${intentRes.code}${extra} · fallback_regex`);
+            summary = await runSpatialCopilotDemo({
+              command: trimmed,
+              enabledLayers,
+              allLayers,
+              shapeKind,
+              signal: ac.signal,
+              handlers: {
+                onLog: append,
+                onFly: flyTo,
+                onShape: onApplyShape,
+                onAnalysis: onApplyAnalysis,
+              },
+            });
+          }
         }
       } catch {
         append("llm · request_failed · fallback_regex");

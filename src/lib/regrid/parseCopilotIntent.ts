@@ -4,8 +4,10 @@ import {
   CopilotStructuredIntentSchema,
   type CopilotStructuredIntent,
 } from "./copilot-intent-schema";
+import { anthropicRateLimitClientKey, tryConsumeAnthropicRateToken } from "./llm-rate-limit";
 
 const ANTHROPIC_VERSION = "2023-06-01";
+/** Default: small fast model (override only if you accept higher cost). */
 const DEFAULT_MODEL = "claude-3-5-haiku-20241022";
 
 function anthropicKey(): string | undefined {
@@ -21,13 +23,13 @@ function anthropicModel(): string {
   return m || DEFAULT_MODEL;
 }
 
-/** Keeps each copilot intent call small (billing). Override with ANTHROPIC_MAX_OUTPUT_TOKENS=256–1024. */
+/** Single outbound completion; keep small (billing). */
 function anthropicMaxOutputTokens(): number {
   const raw =
     typeof process !== "undefined" ? process.env.ANTHROPIC_MAX_OUTPUT_TOKENS?.trim() : undefined;
   const n = raw ? Number.parseInt(raw, 10) : Number.NaN;
-  if (!Number.isFinite(n)) return 512;
-  return Math.min(1024, Math.max(256, n));
+  if (!Number.isFinite(n)) return 384;
+  return Math.min(512, Math.max(256, n));
 }
 
 function extractAssistantText(body: unknown): string {
@@ -41,7 +43,6 @@ function extractAssistantText(body: unknown): string {
   return texts.join("\n").trim();
 }
 
-/** Anthropic sometimes wraps JSON in a markdown fence; strip it for JSON.parse. */
 function stripJsonFence(text: string): string {
   const t = text.trim();
   const fenced = t.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
@@ -49,29 +50,24 @@ function stripJsonFence(text: string): string {
   return t;
 }
 
-const SYSTEM_PROMPT = `You extract siting intent for a California clean-energy map demo called ReGrid.
+/** Short system text — one Anthropic call only; no follow-ups or tool loops. */
+const SYSTEM_PROMPT = `ReGrid: California clean-energy siting demo. Map data is synthetic/illustrative — not permits or engineering.
 
-Hard rules:
-- The map uses synthetic / demo geometry only. It is NOT live federal data, NOT engineering, NOT permits.
-- You must never imply a real-world "best site" or certified lowest-risk outcome was computed.
+Return one JSON object only (no markdown, no extra text). Keys:
+- acres: number (20–500 typical)
+- maxRisk: number 0–100 (UI ceiling; lower score is better)
+- shapeKind: "circle"|"square"|"hexagon"
+- placeQuery: string|null (CA place; null if statewide/unclear)
+- layerFocus: [] or subset of "transmission","wildfire","equity","grid","power_plants" ([] = all)
+- mentionsWind: boolean
+- summary: string optional ≤120 chars (logs)
+- simpleAnswer: string, 2–3 sentences for the user: what they asked + demo-only + no real "lowest risk" claims
 
-Return one JSON object only (no markdown fences, no commentary) with these keys:
-- acres: positive number (footprint size in acres; typical 20–500).
-- maxRisk: number 0–100 = acceptable siting score ceiling in the UI (lower score is better).
-- shapeKind: "circle" | "square" | "hexagon".
-- placeQuery: string or null — California place phrase; null if statewide / unclear.
-- layerFocus: array of zero or more of "transmission" | "wildfire" | "equity" | "grid" | "power_plants". Empty array means all of those matter equally for this demo.
-- mentionsWind: boolean — true for wind siting / wind risk wording (and not primarily solar).
-- summary: optional ≤200 chars for developer-style logs.
-- simpleAnswer: required string, 2–4 short sentences, plain English, for the end user. It must:
-  (1) restate what they asked in one clause,
-  (2) say clearly this is a demo map and scores depend on which layers are on,
-  (3) avoid promising real lowest-risk or regulatory conclusions.
-
-If unsure: placeQuery null, empty layerFocus, mentionsWind false, acres 50, maxRisk 35, shapeKind "circle", and still include simpleAnswer.`;
+If unsure: placeQuery null, layerFocus [], mentionsWind false, acres 50, maxRisk 35, shapeKind "circle".`;
 
 export type ParseCopilotIntentResult =
   | { ok: true; intent: CopilotStructuredIntent }
+  | { ok: false; code: "rate_limited"; retryAfterSec: number }
   | {
       ok: false;
       code:
@@ -89,6 +85,13 @@ export const parseCopilotIntentFn = createServerFn({ method: "POST" })
     const apiKey = anthropicKey();
     if (!apiKey) return { ok: false, code: "missing_anthropic_key" };
 
+    const rl = tryConsumeAnthropicRateToken(anthropicRateLimitClientKey());
+    if (!rl.ok) {
+      return { ok: false, code: "rate_limited", retryAfterSec: rl.retryAfterSec };
+    }
+
+    const command = data.command.slice(0, 1000);
+
     let content: string;
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -101,12 +104,12 @@ export const parseCopilotIntentFn = createServerFn({ method: "POST" })
         body: JSON.stringify({
           model: anthropicModel(),
           max_tokens: anthropicMaxOutputTokens(),
-          temperature: 0.2,
+          temperature: 0.15,
           system: SYSTEM_PROMPT,
           messages: [
             {
               role: "user",
-              content: `User siting request (verbatim):\n${data.command}`,
+              content: command,
             },
           ],
         }),
