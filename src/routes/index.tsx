@@ -256,14 +256,16 @@ function RegridApp() {
           copilotRunning={copilotRunning}
         />
 
-        <RiskScoreHUD
-          hasShape={!!shape}
-          analysisState={analysisState}
-          result={result}
-          onHoverConflict={setHighlightedConflict}
-          relocateSuccess={relocateSuccess}
-          compare={compare}
-        />
+        {(shape || analysisState !== "idle" || result) && (
+          <RiskScoreHUD
+            hasShape={!!shape}
+            analysisState={analysisState}
+            result={result}
+            onHoverConflict={setHighlightedConflict}
+            relocateSuccess={relocateSuccess}
+            compare={compare}
+          />
+        )}
 
         {import.meta.env.DEV ? (
           <div

@@ -1,9 +1,11 @@
 import type { LayerDef } from "./types";
 import powerPlantsRaw from "@/data/power-plants.geojson?raw";
 
-// Mock federal datasets — concentrated around the American Southwest
-// (a typical solar/battery siting region). Pure simulated GeoJSON.
-const SW: [number, number] = [-115.5, 35.8]; // anchor near NV/CA border
+// Mock federal datasets — distributed across U.S. regions for a national demo.
+// Pure simulated GeoJSON.
+const SW: [number, number] = [-111.8, 35.0]; // Southwest
+const TX: [number, number] = [-100.2, 31.1]; // Texas plains
+const MW: [number, number] = [-93.4, 41.7]; // Midwest
 const POWER_PLANTS = JSON.parse(powerPlantsRaw) as GeoJSON.FeatureCollection;
 
 function ring(
@@ -73,6 +75,12 @@ export const LAYERS: LayerDef[] = [
         lineCorridor([SW[0] + 0.4, SW[1] - 1.4], [SW[0] + 1.6, SW[1] + 1.3], 0.009, {
           name: "Pisgah Tap Line",
         }),
+        lineCorridor([TX[0] - 1.9, TX[1] + 0.2], [TX[0] + 2.1, TX[1] - 0.3], 0.012, {
+          name: "Permian 345kV Corridor",
+        }),
+        lineCorridor([MW[0] - 1.3, MW[1] - 0.9], [MW[0] + 1.6, MW[1] + 0.7], 0.01, {
+          name: "Prairie Intertie 230kV",
+        }),
       ],
     },
   },
@@ -87,6 +95,8 @@ export const LAYERS: LayerDef[] = [
         polygon(ring([SW[0] - 0.8, SW[1] + 0.2], 0.18, 0.13), { name: "Substation Cluster A" }),
         polygon(ring([SW[0] + 0.6, SW[1] - 0.7], 0.14, 0.11), { name: "Switchyard B" }),
         polygon(ring([SW[0] + 1.4, SW[1] + 0.5], 0.16, 0.12), { name: "Generation Node C" }),
+        polygon(ring([TX[0] - 0.6, TX[1] + 0.4], 0.2, 0.14), { name: "Substation Cluster D" }),
+        polygon(ring([MW[0] + 0.9, MW[1] - 0.2], 0.17, 0.13), { name: "Switchyard E" }),
       ],
     },
   },
@@ -104,6 +114,14 @@ export const LAYERS: LayerDef[] = [
         }),
         polygon(ring([SW[0] + 1.1, SW[1] + 0.9], 0.4, 0.32, 64, -0.4), {
           name: "Moderate Risk — Spring Mtn",
+          risk: "moderate",
+        }),
+        polygon(ring([TX[0] + 0.2, TX[1] - 0.2], 0.52, 0.36, 64, -0.2), {
+          name: "High Risk Zone — West Texas",
+          risk: "high",
+        }),
+        polygon(ring([MW[0] - 0.5, MW[1] + 0.5], 0.35, 0.26, 64, 0.15), {
+          name: "Moderate Risk — Flint Hills",
           risk: "moderate",
         }),
       ],
@@ -126,6 +144,12 @@ export const LAYERS: LayerDef[] = [
         polygon(ring([SW[0] + 1.6, SW[1] - 0.9], 0.24, 0.18, 48, 0.6), {
           name: "Census Tract 7712 — Disadvantaged",
         }),
+        polygon(ring([TX[0] - 1.0, TX[1] + 0.8], 0.22, 0.17, 48, -0.15), {
+          name: "Census Tract 6621 — Disadvantaged",
+        }),
+        polygon(ring([MW[0] + 0.7, MW[1] - 0.6], 0.23, 0.17, 48, 0.22), {
+          name: "Census Tract 4217 — Disadvantaged",
+        }),
       ],
     },
   },
@@ -139,6 +163,6 @@ export const LAYERS: LayerDef[] = [
 ];
 
 export const INITIAL_VIEW = {
-  center: [-118.39424354249999, 37.2675677270001] as [number, number],
-  zoom: 6.6,
+  center: [-98.8, 39.5] as [number, number],
+  zoom: 4.4,
 };

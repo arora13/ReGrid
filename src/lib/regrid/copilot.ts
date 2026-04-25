@@ -11,7 +11,7 @@ export interface ParsedCopilotCommand {
   wantsWildfire: boolean;
   wantsEJ: boolean;
   wantsGrid: boolean;
-  regionHint: "california" | "southwest" | null;
+  regionHint: "southwest" | "texas" | "midwest" | "southeast" | "northeast" | null;
 }
 
 export function parseCopilotCommand(text: string): ParsedCopilotCommand {
@@ -29,11 +29,21 @@ export function parseCopilotCommand(text: string): ParsedCopilotCommand {
     wantsWildfire: /\bwildfire\b|\bfire\b|\busda\b/i.test(lower),
     wantsEJ: /\bejscreen\b|\bdisadvantaged\b|\bjustice\b|\bej\b/i.test(lower),
     wantsGrid: /\beia\b|\bsubstation\b|\bswitchyard\b|\bgrid\b/i.test(lower),
-    regionHint: /\bcalifornia\b|\bca\b/.test(lower)
-      ? "california"
-      : /\bnevada\b|\bnv\b|\barizona\b|\baz\b|\bsouthwest\b/.test(lower)
-        ? "southwest"
-        : null,
+    regionHint: /\barizona\b|\baz\b|\bnevada\b|\bnv\b|\bnew\s?mexico\b|\bnm\b|\bsouthwest\b/.test(
+      lower,
+    )
+      ? "southwest"
+      : /\btexas\b|\btx\b/.test(lower)
+        ? "texas"
+        : /\bmidwest\b|\billinois\b|\bil\b|\biowa\b|\bio\b|\bminnesota\b|\bmn\b|\bkansas\b|\bks\b/.test(
+              lower,
+            )
+          ? "midwest"
+          : /\bgeorgia\b|\bga\b|\bflorida\b|\bfl\b|\bcarolina\b|\bsoutheast\b/.test(lower)
+            ? "southeast"
+            : /\bnew\s?york\b|\bny\b|\bpennsylvania\b|\bpa\b|\bnortheast\b/.test(lower)
+              ? "northeast"
+              : null,
   };
 }
 
@@ -59,11 +69,19 @@ function delay(ms: number, signal?: AbortSignal) {
 }
 
 function pickInitialCenter(parsed: ParsedCopilotCommand): [number, number] {
-  const base = INITIAL_VIEW.center;
-  // Nudge east toward transmission mock data for “near transmission” prompts.
-  const eastBias = parsed.wantsTransmission ? 0.35 : 0.12;
+  // Demo uses regional synthetic data; map user hints to broad U.S. regions.
+  const regionalBase: Record<NonNullable<ParsedCopilotCommand["regionHint"]>, [number, number]> = {
+    southwest: [-111.6, 34.8],
+    texas: [-100.0, 31.3],
+    midwest: [-93.7, 41.6],
+    southeast: [-84.6, 33.5],
+    northeast: [-74.7, 41.2],
+  };
+  const base = parsed.regionHint ? regionalBase[parsed.regionHint] : INITIAL_VIEW.center;
+  // Nudge toward likely corridor overlays for transmission-focused prompts.
+  const eastBias = parsed.wantsTransmission ? 0.16 : 0.05;
   const northBias =
-    parsed.regionHint === "california" ? 0.08 : parsed.regionHint === "southwest" ? -0.05 : 0.0;
+    parsed.regionHint === "southeast" ? -0.04 : parsed.regionHint === "northeast" ? 0.04 : 0.0;
   return [base[0] + eastBias, base[1] + northBias];
 }
 

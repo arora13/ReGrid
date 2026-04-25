@@ -22,8 +22,9 @@ export function SpatialCopilot({
   onCopilotRunningChange,
 }: SpatialCopilotProps) {
   const [open, setOpen] = useState(false);
+  const [chipsOpen, setChipsOpen] = useState(false);
   const [command, setCommand] = useState(
-    "Find me a 50 acre site near a transmission line in California with a risk score under 20.",
+    "Find me a 50 acre site near transmission with a risk score under 20 anywhere in the U.S.",
   );
   const [log, setLog] = useState<string[]>(["system · copilot_ready · bounded_tool_loop=true"]);
   const [running, setRunning] = useState(false);
@@ -44,9 +45,9 @@ export function SpatialCopilot({
 
   const MISSION_CHIPS = useMemo(
     () => [
-      "50 acres near transmission in CA, risk under 20",
-      "Battery site: avoid wildfire + EJ overlap, risk under 25",
-      "Grid-tied solar: prioritize transmission access, risk under 35",
+      "50 acres near transmission in Texas, risk under 20",
+      "Battery site in Texas: avoid wildfire + EJ overlap, risk under 25",
+      "Grid-tied solar in the Midwest: prioritize transmission access, risk under 35",
     ],
     [],
   );
@@ -93,7 +94,7 @@ export function SpatialCopilot({
   };
 
   return (
-    <div className="pointer-events-none z-30 shrink-0 border-t border-white/[0.08] bg-gradient-to-t from-background via-background/95 to-background/80 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
+    <div className="pointer-events-none z-30 shrink-0 border-t border-white/[0.08] bg-gradient-to-t from-background via-background/95 to-background/80 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
       <div className="pointer-events-auto mx-auto w-full max-w-[920px] px-1 sm:px-2">
         <motion.div
           layout
@@ -152,7 +153,7 @@ export function SpatialCopilot({
           </AnimatePresence>
 
           <form
-            className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center"
+            className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center"
             onSubmit={(e) => {
               e.preventDefault();
               void handleRun();
@@ -162,8 +163,8 @@ export function SpatialCopilot({
               value={command}
               onChange={(e) => setCommand(e.target.value)}
               disabled={running}
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/25"
-              placeholder='Try: "50 acres near transmission in CA, risk under 20"'
+              className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/25"
+              placeholder='Try: "50 acres near transmission in Texas, risk under 20"'
             />
             <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
               <button
@@ -176,23 +177,34 @@ export function SpatialCopilot({
             </div>
           </form>
 
-          <div className="border-t border-white/[0.06] px-3 pb-3 pt-2">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Suggested missions
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {MISSION_CHIPS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  disabled={running}
-                  onClick={() => setCommand(c)}
-                  className="max-w-full rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] text-foreground/90 transition hover:border-white/20 hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <span className="block max-w-[520px] truncate">{c}</span>
-                </button>
-              ))}
+          <div className="border-t border-white/[0.06] px-3 pb-2 pt-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Suggested missions
+              </p>
+              <button
+                type="button"
+                onClick={() => setChipsOpen((v) => !v)}
+                className="rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1 text-[10px] text-muted-foreground transition hover:border-white/20 hover:text-foreground"
+              >
+                {chipsOpen ? "Hide" : "Show"}
+              </button>
             </div>
+            {chipsOpen && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {MISSION_CHIPS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    disabled={running}
+                    onClick={() => setCommand(c)}
+                    className="max-w-full rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] text-foreground/90 transition hover:border-white/20 hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <span className="block max-w-[520px] truncate">{c}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </motion.div>
       </div>

@@ -135,8 +135,8 @@
 
   /* Glass + glow tokens */
   /* Glass: keep readable contrast but let more map show through */
-  --glass-bg: oklch(0.18 0.025 240 / 0.42);
-  --glass-bg-strong: oklch(0.16 0.025 240 / 0.58);
+  --glass-bg: oklch(0.18 0.025 240 / 0.30);
+  --glass-bg-strong: oklch(0.16 0.025 240 / 0.45);
   --glass-border: oklch(0.78 0.22 152 / 0.16);
   --glass-border-strong: oklch(0.78 0.22 152 / 0.28);
   --glow-emerald: 0 0 24px oklch(0.78 0.22 152 / 0.45), 0 0 60px oklch(0.78 0.22 152 / 0.18);

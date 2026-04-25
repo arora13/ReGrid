@@ -65,12 +65,12 @@ export function LeftOperationsRail({
       initial={{ y: -10, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className="pointer-events-auto absolute left-4 top-4 z-20 w-[min(340px,calc(100vw-1.5rem))] sm:left-6 sm:top-6 sm:w-[min(340px,calc(100vw-2rem))]"
+      className="pointer-events-auto absolute left-4 top-4 z-20 w-[min(300px,calc(100vw-1.5rem))] sm:left-8 sm:top-8 sm:w-[min(300px,calc(100vw-2.5rem))]"
     >
-      <div className="glass flex max-h-[calc(100svh-5rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] shadow-sm">
+      <div className="glass flex max-h-[calc(100%-0.5rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] shadow-sm">
 
         {/* Fixed title header */}
-        <div className="shrink-0 border-b border-white/[0.06] px-4 py-3">
+        <div className="shrink-0 border-b border-white/[0.06] px-4 py-3.5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-baseline gap-2">
               <h1 className="truncate text-sm font-semibold tracking-tight">ReGrid</h1>
@@ -92,10 +92,10 @@ export function LeftOperationsRail({
 
         {/* Scrollable controls */}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="space-y-3 p-3">
+          <div className="space-y-4 p-4">
 
             {/* Workflow tracker */}
-            <div className="rounded-xl border border-white/[0.06] bg-black/15 px-3 py-2">
+            <div className="rounded-xl border border-white/[0.06] bg-black/15 px-3 py-2.5">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[10px] font-medium text-foreground/90">Workflow</p>
                 <p className="text-[10px] text-muted-foreground">Step {step} / 3</p>
@@ -120,7 +120,7 @@ export function LeftOperationsRail({
 
             {/* Mission */}
             <div>
-              <p className="mb-1.5 text-[10px] font-medium text-foreground/90">Mission</p>
+              <p className="mb-2 text-[10px] font-medium text-foreground/90">Mission</p>
               <div className="grid grid-cols-3 gap-1.5">
                 {(
                   [
@@ -163,7 +163,7 @@ export function LeftOperationsRail({
                 value={acreage}
                 disabled={busy}
                 onChange={(e) => onAcreageChange(Number(e.target.value))}
-                className="mt-1.5 w-full accent-sky-400 disabled:opacity-40"
+                className="mt-2 w-full accent-sky-400 disabled:opacity-40"
               />
             </div>
 
@@ -173,7 +173,7 @@ export function LeftOperationsRail({
                 <p className="text-[10px] font-medium text-foreground/90">Footprint</p>
                 <p className="text-[10px] text-muted-foreground">{hasShape ? "Anchored" : "None"}</p>
               </div>
-              <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+              <div className="mt-2 grid grid-cols-3 gap-1.5">
                 {TOOLS.map((t) => {
                   const active = activeTool === t.kind;
                   return (
@@ -197,8 +197,8 @@ export function LeftOperationsRail({
             </div>
 
             {/* Evaluate */}
-            <div className="border-t border-white/[0.06] pt-3">
-              <p className="mb-1.5 text-[10px] font-medium text-foreground/90">Evaluate</p>
+            <div className="border-t border-white/[0.06] pt-4">
+              <p className="mb-2 text-[10px] font-medium text-foreground/90">Evaluate</p>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"

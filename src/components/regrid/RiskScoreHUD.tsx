@@ -84,10 +84,10 @@ export function RiskScoreHUD({
       initial={{ y: -10, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.35, ease: "easeOut", delay: 0.05 }}
-      className="pointer-events-auto absolute top-4 right-4 z-20 w-[min(320px,calc(100vw-2rem))] sm:top-6 sm:right-6"
+      className="pointer-events-auto absolute right-4 top-4 z-20 w-[min(280px,calc(100vw-2rem))] sm:right-8 sm:top-8 lg:w-[280px]"
     >
       <div
-        className={`glass flex max-h-[calc(100svh-8rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] p-3 shadow-sm transition ${
+        className={`glass flex max-h-[calc(100%-0.5rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] p-4 shadow-sm transition ${
           dormant ? "opacity-70" : "opacity-100"
         }`}
       >
@@ -107,7 +107,7 @@ export function RiskScoreHUD({
           </div>
         </div>
 
-        <div className="mt-3 flex shrink-0 items-center gap-3">
+        <div className="mt-4 flex shrink-0 items-center gap-3.5">
           <div className="relative h-16 w-16 shrink-0">
             <svg viewBox="0 0 64 64" className="h-16 w-16 -rotate-90">
               <circle cx="32" cy="32" r="26" fill="none" stroke="oklch(1 0 0 / 0.08)" strokeWidth="6" />
@@ -192,7 +192,7 @@ export function RiskScoreHUD({
               </div>
             )}
 
-            <div className="mt-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+            <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
               <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Next</p>
               <p className="mt-1 text-[12px] leading-snug text-foreground/90">{nextAction}</p>
             </div>
@@ -206,7 +206,7 @@ export function RiskScoreHUD({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 6 }}
               transition={{ duration: 0.25 }}
-              className="mt-3 shrink-0 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[12px] font-medium text-emerald-200"
+              className="mt-4 shrink-0 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[12px] font-medium text-emerald-200"
             >
               Better site found — footprint updated.
             </motion.div>
@@ -214,7 +214,7 @@ export function RiskScoreHUD({
         </AnimatePresence>
 
         {compare.beforeScore !== null && compare.afterScore !== null && (
-          <div className="mt-3 rounded-xl border border-white/[0.06] bg-black/20 px-3 py-2">
+          <div className="mt-4 rounded-xl border border-white/[0.06] bg-black/20 px-3 py-2.5">
             <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Comparison</p>
             <p className="mt-1 text-[12px] font-semibold text-foreground/95">
               Risk {compare.beforeScore} → {compare.afterScore}
@@ -227,7 +227,7 @@ export function RiskScoreHUD({
         )}
 
         {analysisState === "result" && result && conflicts.length > 0 && (
-          <div className="mt-4 min-h-0 flex-1 border-t border-white/[0.06] pt-3">
+          <div className="mt-5 min-h-0 flex-1 border-t border-white/[0.06] pt-4">
             <p className="text-[11px] font-medium text-foreground/90">Top drivers</p>
             <div className="mt-2 max-h-[34vh] space-y-1.5 overflow-y-auto pr-1 sm:max-h-[38vh]">
               {conflicts.map((c) => (
