@@ -11,6 +11,10 @@ import { loadManifestLayers } from "@/lib/regrid/datasets";
 import { clampLngLatToCalifornia, LOCAL_RELOCATE_MAX_OFFSET_DEG } from "@/lib/regrid/california";
 import { buildShape, distanceMeters } from "@/lib/regrid/geo";
 import { analyzeShape, findOptimalRelocation } from "@/lib/regrid/analyze";
+import {
+  federalScreenFootprintFn,
+  mergeFederalScreenIntoAnalysis,
+} from "@/lib/regrid/real-dataset-screen";
 import { getPublicMapboxTokenFromEnv } from "@/lib/regrid/env";
 import type {
   AnalysisResult,
@@ -159,9 +163,21 @@ function RegridApp() {
     setAnalysisState("analyzing");
     setResult(null);
     setTimeout(() => {
-      const r = analyzeShape(shape, enabledLayers, layersRef.current);
-      setResult(r);
-      setAnalysisState("result");
+      void (async () => {
+        let r = analyzeShape(shape, enabledLayers, layersRef.current);
+        try {
+          const poly = shape.geojson.geometry;
+          if (poly.type === "Polygon" && poly.coordinates[0]?.length) {
+            const ring = poly.coordinates[0].map(([lng, lat]) => [lng, lat]);
+            const snap = await federalScreenFootprintFn({ data: { ring } });
+            r = mergeFederalScreenIntoAnalysis(r, snap);
+          }
+        } catch {
+          /* keep mock-only result if federal screening fails */
+        }
+        setResult(r);
+        setAnalysisState("result");
+      })();
     }, 2000);
   };
 
