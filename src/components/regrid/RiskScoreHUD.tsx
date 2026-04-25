@@ -51,9 +51,9 @@ export function RiskScoreHUD({
       initial={{ y: -10, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.35, ease: "easeOut", delay: 0.05 }}
-      className="pointer-events-auto absolute top-8 right-8 z-20 w-[320px]"
+      className="pointer-events-auto absolute top-8 right-8 z-20 w-[min(340px,calc(100vw-2rem))]"
     >
-      <div className="glass rounded-2xl border border-white/[0.08] p-4 shadow-sm">
+      <div className="glass flex max-h-[calc(100vh-7.25rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-medium text-foreground/90">Risk</p>
@@ -70,7 +70,7 @@ export function RiskScoreHUD({
           </div>
         </div>
 
-        <div className="mt-4 flex items-center gap-4">
+        <div className="mt-4 flex shrink-0 items-center gap-4">
           <div className="relative h-16 w-16 shrink-0">
             <svg viewBox="0 0 64 64" className="h-16 w-16 -rotate-90">
               <circle cx="32" cy="32" r="26" fill="none" stroke="oklch(1 0 0 / 0.08)" strokeWidth="6" />
@@ -124,7 +124,7 @@ export function RiskScoreHUD({
                 <p className="text-sm font-medium text-foreground/90">Finding a better site…</p>
                 <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
                   <motion.div
-                    className="h-full bg-cyan-300/80"
+                    className="h-full bg-sky-400/70"
                     initial={{ x: "-35%" }}
                     animate={{ x: "120%" }}
                     transition={{ duration: 0.95, repeat: Infinity, ease: "linear" }}
@@ -153,7 +153,7 @@ export function RiskScoreHUD({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 6 }}
               transition={{ duration: 0.25 }}
-              className="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[12px] font-medium text-emerald-200"
+              className="mt-3 shrink-0 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[12px] font-medium text-emerald-200"
             >
               Better site found — footprint updated.
             </motion.div>
@@ -161,9 +161,9 @@ export function RiskScoreHUD({
         </AnimatePresence>
 
         {analysisState === "result" && result && conflicts.length > 0 && (
-          <div className="mt-4 border-t border-white/[0.06] pt-3">
+          <div className="mt-4 min-h-0 flex-1 border-t border-white/[0.06] pt-3">
             <p className="text-[11px] font-medium text-foreground/90">Conflicts</p>
-            <div className="mt-2 space-y-1.5">
+            <div className="mt-2 max-h-[34vh] space-y-1.5 overflow-y-auto pr-1 sm:max-h-[38vh]">
               {conflicts.map((c) => (
                 <button
                   key={c.id}
@@ -183,8 +183,12 @@ export function RiskScoreHUD({
                     aria-hidden
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12px] font-medium text-foreground">{c.label}</span>
-                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{c.detail}</span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden">
+                      {c.label}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden">
+                      {c.detail}
+                    </span>
                   </span>
                 </button>
               ))}

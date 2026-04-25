@@ -135,7 +135,7 @@ npm run dev
 ```
 
 Open the app. If `VITE_MAPBOX_TOKEN` is set in `.env.local`, the map loads immediately; otherwise paste a token in the gate, then:
-- Toggle layers in the bottom-left dock
+- Toggle layers in the left operations rail (collapsible section)
 - Place a shape on map click
 - Analyze risk
 - Auto-relocate for optimized siting

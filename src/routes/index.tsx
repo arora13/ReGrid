@@ -3,8 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MapCanvas } from "@/components/regrid/MapCanvas";
 import { TokenGate } from "@/components/regrid/TokenGate";
 import { SpatialCopilot } from "@/components/regrid/SpatialCopilot";
-import { ProjectControlPanel } from "@/components/regrid/ProjectControlPanel";
-import { LayersDock } from "@/components/regrid/LayersDock";
+import { LeftOperationsRail } from "@/components/regrid/LeftOperationsRail";
 import { RiskScoreHUD } from "@/components/regrid/RiskScoreHUD";
 import { LAYERS } from "@/lib/regrid/layers";
 import { buildShape } from "@/lib/regrid/geo";
@@ -185,7 +184,10 @@ function RegridApp() {
         }}
       />
 
-      <ProjectControlPanel
+      <LeftOperationsRail
+        layers={layers}
+        enabledLayers={enabledLayers}
+        onToggleLayer={handleToggleLayer}
         activeTool={activeTool}
         onSelectTool={setActiveTool}
         hasShape={!!shape}
@@ -195,8 +197,6 @@ function RegridApp() {
         analysisState={analysisState}
         copilotRunning={copilotRunning}
       />
-
-      <LayersDock layers={layers} enabled={enabledLayers} onToggle={handleToggleLayer} />
 
       <RiskScoreHUD
         hasShape={!!shape}
