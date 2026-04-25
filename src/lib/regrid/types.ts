@@ -25,7 +25,8 @@ export type LayerId =
   | "hifld-transmission"
   | "eia-grid"
   | "usda-wildfire"
-  | "epa-ejscreen";
+  | "epa-ejscreen"
+  | "power-plants";
 
 export interface LayerDef {
   id: LayerId;

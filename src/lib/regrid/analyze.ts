@@ -45,6 +45,10 @@ const LAYER_LABELS: Record<LayerId, { hit: string; near: string }> = {
     hit: "Equity-priority area overlap",
     near: "Equity-priority area nearby (buffer)",
   },
+  "power-plants": {
+    hit: "Power plant footprint overlap",
+    near: "Near existing power plant facilities",
+  },
 };
 
 function stable01(seed: string): number {
@@ -70,13 +74,30 @@ export function analyzeShape(
   for (const layer of LAYERS) {
     if (!enabled.has(layer.id)) continue;
     for (const f of layer.geojson.features) {
-      if (f.geometry.type !== "Polygon") continue;
-      const ring = f.geometry.coordinates[0] as number[][];
-      const centroid = polygonCentroid(ring);
-      const intersects = pointInRing(shape.center, ring);
-      const dist = distanceMeters(shape.center, centroid as [number, number]);
+      let intersects = false;
+      let dist = Infinity;
+      const geometry = f.geometry;
+      if (!geometry) continue;
+      if (geometry.type === "Polygon") {
+        const ring = geometry.coordinates[0] as number[][];
+        const centroid = polygonCentroid(ring);
+        intersects = pointInRing(shape.center, ring);
+        dist = distanceMeters(shape.center, centroid as [number, number]);
+      } else if (geometry.type === "Point") {
+        const pt = geometry.coordinates as [number, number];
+        dist = distanceMeters(shape.center, pt);
+        intersects = dist < Math.max(700, shape.radiusMeters * 0.55);
+      } else {
+        continue;
+      }
       const buffer =
-        layer.id === "usda-wildfire" ? 25000 : layer.id === "epa-ejscreen" ? 18000 : 9000;
+        layer.id === "usda-wildfire"
+          ? 25000
+          : layer.id === "epa-ejscreen"
+            ? 18000
+            : layer.id === "power-plants"
+              ? 14000
+              : 9000;
 
       if (intersects) {
         conflicts.push({
@@ -86,7 +107,14 @@ export function analyzeShape(
           layerId: layer.id,
           detail: `${(f.properties as Record<string, string>)?.name ?? "Selected area"} — overlap`,
         });
-        score += layer.id === "usda-wildfire" ? 32 : layer.id === "epa-ejscreen" ? 28 : 18;
+        score +=
+          layer.id === "usda-wildfire"
+            ? 32
+            : layer.id === "epa-ejscreen"
+              ? 28
+              : layer.id === "power-plants"
+                ? 14
+                : 18;
       } else if (dist < buffer) {
         conflicts.push({
           id: `${layer.id}-${conflicts.length}`,
@@ -95,7 +123,7 @@ export function analyzeShape(
           layerId: layer.id,
           detail: `${(f.properties as Record<string, string>)?.name ?? "Nearby feature"} — ${(dist / 1000).toFixed(1)} km away`,
         });
-        score += layer.id === "hifld-transmission" ? 6 : 10;
+        score += layer.id === "hifld-transmission" ? 6 : layer.id === "power-plants" ? 8 : 10;
       }
     }
   }

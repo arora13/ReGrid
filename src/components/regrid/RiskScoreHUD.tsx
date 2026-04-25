@@ -27,6 +27,7 @@ function layerAccent(layerId: LayerId): string {
   if (layerId === "hifld-transmission" || layerId === "eia-grid") return "#38bdf8"; // cyan/blue
   if (layerId === "epa-ejscreen") return "#c4b5fd"; // purple
   if (layerId === "usda-wildfire") return "#fb923c"; // orange
+  if (layerId === "power-plants") return "#22d3ee"; // data upload
   return "#94a3b8";
 }
 

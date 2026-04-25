@@ -1,8 +1,10 @@
 import type { LayerDef } from "./types";
+import powerPlantsRaw from "@/data/power-plants.geojson?raw";
 
 // Mock federal datasets — concentrated around the American Southwest
 // (a typical solar/battery siting region). Pure simulated GeoJSON.
 const SW: [number, number] = [-115.5, 35.8]; // anchor near NV/CA border
+const POWER_PLANTS = JSON.parse(powerPlantsRaw) as GeoJSON.FeatureCollection;
 
 function ring(
   center: [number, number],
@@ -127,9 +129,16 @@ export const LAYERS: LayerDef[] = [
       ],
     },
   },
+  {
+    id: "power-plants",
+    name: "Power Plant Facilities",
+    agency: "Discord dataset upload",
+    color: "#22d3ee",
+    geojson: POWER_PLANTS,
+  },
 ];
 
 export const INITIAL_VIEW = {
-  center: SW,
-  zoom: 7.4,
+  center: [-118.39424354249999, 37.2675677270001] as [number, number],
+  zoom: 6.6,
 };

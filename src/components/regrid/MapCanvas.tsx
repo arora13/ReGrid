@@ -239,35 +239,62 @@ export function MapCanvas({
       const srcId = `src-${l.id}`;
       const fillId = `fill-${l.id}`;
       const lineId = `line-${l.id}`;
+      const circleId = `circle-${l.id}`;
       if (!map.getSource(srcId)) {
         map.addSource(srcId, { type: "geojson", data: l.geojson });
-        map.addLayer({
-          id: fillId,
-          type: "fill",
-          source: srcId,
-          paint: {
-            "fill-color": l.color,
-            "fill-opacity": 0.12,
-          },
-        });
-        map.addLayer({
-          id: lineId,
-          type: "line",
-          source: srcId,
-          paint: {
-            "line-color": l.color,
-            "line-width": 1.25,
-            "line-opacity": 0.75,
-          },
-        });
+        if (l.id === "power-plants") {
+          map.addLayer({
+            id: circleId,
+            type: "circle",
+            source: srcId,
+            paint: {
+              "circle-color": l.color,
+              "circle-radius": 2.8,
+              "circle-opacity": 0.72,
+              "circle-stroke-color": "#e2e8f0",
+              "circle-stroke-opacity": 0.35,
+              "circle-stroke-width": 0.5,
+            },
+          });
+        } else {
+          map.addLayer({
+            id: fillId,
+            type: "fill",
+            source: srcId,
+            paint: {
+              "fill-color": l.color,
+              "fill-opacity": 0.12,
+            },
+          });
+          map.addLayer({
+            id: lineId,
+            type: "line",
+            source: srcId,
+            paint: {
+              "line-color": l.color,
+              "line-width": 1.25,
+              "line-opacity": 0.75,
+            },
+          });
+        }
       }
       const visible = enabledLayers.has(l.id) ? "visible" : "none";
-      map.setLayoutProperty(fillId, "visibility", visible);
-      map.setLayoutProperty(lineId, "visibility", visible);
+      if (l.id === "power-plants") {
+        map.setLayoutProperty(circleId, "visibility", visible);
+      } else {
+        map.setLayoutProperty(fillId, "visibility", visible);
+        map.setLayoutProperty(lineId, "visibility", visible);
+      }
 
       const isHighlighted = highlightedConflict === l.id;
-      map.setPaintProperty(fillId, "fill-opacity", isHighlighted ? 0.34 : 0.12);
-      map.setPaintProperty(lineId, "line-width", isHighlighted ? 2.4 : 1.25);
+      if (l.id === "power-plants") {
+        map.setPaintProperty(circleId, "circle-radius", isHighlighted ? 4.2 : 2.8);
+        map.setPaintProperty(circleId, "circle-opacity", isHighlighted ? 0.95 : 0.72);
+        map.setPaintProperty(circleId, "circle-stroke-width", isHighlighted ? 1.15 : 0.5);
+      } else {
+        map.setPaintProperty(fillId, "fill-opacity", isHighlighted ? 0.34 : 0.12);
+        map.setPaintProperty(lineId, "line-width", isHighlighted ? 2.4 : 1.25);
+      }
     }
   }, [layers, enabledLayers, styleLoaded, highlightedConflict]);
 
