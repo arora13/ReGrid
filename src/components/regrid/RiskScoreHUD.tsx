@@ -28,6 +28,7 @@ function layerAccent(layerId: LayerId): string {
   if (layerId === "epa-ejscreen") return "#c4b5fd"; // purple
   if (layerId === "usda-wildfire") return "#fb923c"; // orange
   if (layerId === "power-plants") return "#22d3ee"; // data upload
+  if (typeof layerId === "string" && layerId.startsWith("ext:")) return "#84cc16"; // lime — external datasets
   return "#94a3b8";
 }
 
@@ -87,7 +88,7 @@ export function RiskScoreHUD({
       className="pointer-events-auto absolute right-4 top-4 z-20 w-[min(280px,calc(100vw-2rem))] sm:right-8 sm:top-8 lg:w-[280px]"
     >
       <div
-        className={`glass flex max-h-[calc(100%-0.5rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] p-4 shadow-sm transition ${
+        className={`glass flex max-h-[calc(100vh-220px)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] p-4 shadow-sm transition ${
           dormant ? "opacity-70" : "opacity-100"
         }`}
       >

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { LayerDef, LayerId, ShapeKind } from "@/lib/regrid/types";
 import { ChevronDown, Circle, Hexagon, Square, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 
 export type ProjectKind = "solar" | "battery" | "grid-tied";
 
@@ -51,6 +52,7 @@ export function LeftOperationsRail({
 }: LeftOperationsRailProps) {
   const busy = analysisState === "analyzing" || analysisState === "relocating" || copilotRunning;
   const [layersOpen, setLayersOpen] = useState(false);
+  const [railOpen, setRailOpen] = useState(true);
 
   const enabledCount = useMemo(() => enabledLayers.size, [enabledLayers]);
 
@@ -67,7 +69,8 @@ export function LeftOperationsRail({
       transition={{ duration: 0.35, ease: "easeOut" }}
       className="pointer-events-auto absolute left-4 top-4 z-20 w-[min(300px,calc(100vw-1.5rem))] sm:left-8 sm:top-8 sm:w-[min(300px,calc(100vw-2.5rem))]"
     >
-      <div className="glass flex max-h-[calc(100%-0.5rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] shadow-sm">
+      <div className="flex gap-2">
+        <div className={`glass flex max-h-[calc(100vh-220px)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] shadow-sm transition-all duration-300 ${railOpen ? "w-full sm:w-[300px]" : "hidden"}`}>
 
         {/* Fixed title header */}
         <div className="shrink-0 border-b border-white/[0.06] px-4 py-3.5">
@@ -285,6 +288,28 @@ export function LeftOperationsRail({
             )}
           </div>
         </div>
+      </div>
+      {!railOpen && (
+        <button
+          type="button"
+          onClick={() => setRailOpen(true)}
+          className="glass flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-black/40 text-foreground shadow-sm transition hover:bg-white/[0.05]"
+          title="Open operations rail"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
+      )}
+      {railOpen && (
+        <button
+          type="button"
+          onClick={() => setRailOpen(false)}
+          className="glass flex h-10 w-8 shrink-0 items-center justify-center rounded-r-2xl border-y border-r border-white/[0.08] bg-black/20 text-muted-foreground shadow-sm transition hover:bg-white/[0.05] hover:text-foreground"
+          title="Collapse operations rail"
+          style={{ transform: "translateX(-4px)" }}
+        >
+          <ChevronRight className="h-4 w-4 rotate-180" />
+        </button>
+      )}
       </div>
     </motion.aside>
   );

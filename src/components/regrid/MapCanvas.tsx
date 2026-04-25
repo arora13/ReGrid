@@ -4,6 +4,11 @@ import type { DrawnShape, LayerDef, LayerId } from "@/lib/regrid/types";
 import { INITIAL_VIEW } from "@/lib/regrid/layers";
 import { buildShape } from "@/lib/regrid/geo";
 
+/** Mapbox GL layer/source ids must be alphanumeric, dash, or underscore */
+function mapboxLayerToken(layerId: string) {
+  return layerId.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
 interface MapCanvasProps {
   token: string;
   layers: LayerDef[];
@@ -236,10 +241,11 @@ export function MapCanvas({
     if (!map || !styleLoaded) return;
 
     for (const l of layers) {
-      const srcId = `src-${l.id}`;
-      const fillId = `fill-${l.id}`;
-      const lineId = `line-${l.id}`;
-      const circleId = `circle-${l.id}`;
+      const tok = mapboxLayerToken(l.id);
+      const srcId = `src-${tok}`;
+      const fillId = `fill-${tok}`;
+      const lineId = `line-${tok}`;
+      const circleId = `circle-${tok}`;
       if (!map.getSource(srcId)) {
         map.addSource(srcId, { type: "geojson", data: l.geojson });
         if (l.id === "power-plants") {

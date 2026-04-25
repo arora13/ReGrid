@@ -3,9 +3,9 @@ import powerPlantsRaw from "@/data/power-plants.geojson?raw";
 
 // Mock federal datasets — distributed across U.S. regions for a national demo.
 // Pure simulated GeoJSON.
-const SW: [number, number] = [-111.8, 35.0]; // Southwest
-const TX: [number, number] = [-100.2, 31.1]; // Texas plains
-const MW: [number, number] = [-93.4, 41.7]; // Midwest
+const NCAL: [number, number] = [-121.5, 39.0]; // NorCal
+const CCAL: [number, number] = [-119.4, 36.8]; // Central
+const SCAL: [number, number] = [-116.2, 34.0]; // SoCal
 const POWER_PLANTS = JSON.parse(powerPlantsRaw) as GeoJSON.FeatureCollection;
 
 function ring(
@@ -66,20 +66,20 @@ export const LAYERS: LayerDef[] = [
     geojson: {
       type: "FeatureCollection",
       features: [
-        lineCorridor([SW[0] - 1.6, SW[1] - 0.4], [SW[0] + 1.8, SW[1] + 0.6], 0.012, {
+        lineCorridor([SCAL[0] - 1.6, SCAL[1] - 0.4], [SCAL[0] + 1.8, SCAL[1] + 0.6], 0.012, {
           name: "Mojave 500kV Corridor",
         }),
-        lineCorridor([SW[0] - 0.9, SW[1] + 0.9], [SW[0] + 1.2, SW[1] - 1.1], 0.01, {
+        lineCorridor([SCAL[0] - 0.9, SCAL[1] + 0.9], [SCAL[0] + 1.2, SCAL[1] - 1.1], 0.01, {
           name: "Eldorado–Crystal 230kV",
         }),
-        lineCorridor([SW[0] + 0.4, SW[1] - 1.4], [SW[0] + 1.6, SW[1] + 1.3], 0.009, {
+        lineCorridor([SCAL[0] + 0.4, SCAL[1] - 1.4], [SCAL[0] + 1.6, SCAL[1] + 1.3], 0.009, {
           name: "Pisgah Tap Line",
         }),
-        lineCorridor([TX[0] - 1.9, TX[1] + 0.2], [TX[0] + 2.1, TX[1] - 0.3], 0.012, {
-          name: "Permian 345kV Corridor",
+        lineCorridor([CCAL[0] - 1.9, CCAL[1] + 0.2], [CCAL[0] + 2.1, CCAL[1] - 0.3], 0.012, {
+          name: "Central 345kV Corridor",
         }),
-        lineCorridor([MW[0] - 1.3, MW[1] - 0.9], [MW[0] + 1.6, MW[1] + 0.7], 0.01, {
-          name: "Prairie Intertie 230kV",
+        lineCorridor([NCAL[0] - 1.3, NCAL[1] - 0.9], [NCAL[0] + 1.6, NCAL[1] + 0.7], 0.01, {
+          name: "NorCal Intertie 230kV",
         }),
       ],
     },
@@ -92,11 +92,11 @@ export const LAYERS: LayerDef[] = [
     geojson: {
       type: "FeatureCollection",
       features: [
-        polygon(ring([SW[0] - 0.8, SW[1] + 0.2], 0.18, 0.13), { name: "Substation Cluster A" }),
-        polygon(ring([SW[0] + 0.6, SW[1] - 0.7], 0.14, 0.11), { name: "Switchyard B" }),
-        polygon(ring([SW[0] + 1.4, SW[1] + 0.5], 0.16, 0.12), { name: "Generation Node C" }),
-        polygon(ring([TX[0] - 0.6, TX[1] + 0.4], 0.2, 0.14), { name: "Substation Cluster D" }),
-        polygon(ring([MW[0] + 0.9, MW[1] - 0.2], 0.17, 0.13), { name: "Switchyard E" }),
+        polygon(ring([SCAL[0] - 0.8, SCAL[1] + 0.2], 0.18, 0.13), { name: "Substation Cluster A" }),
+        polygon(ring([SCAL[0] + 0.6, SCAL[1] - 0.7], 0.14, 0.11), { name: "Switchyard B" }),
+        polygon(ring([SCAL[0] + 1.4, SCAL[1] + 0.5], 0.16, 0.12), { name: "Generation Node C" }),
+        polygon(ring([CCAL[0] - 0.6, CCAL[1] + 0.4], 0.2, 0.14), { name: "Substation Cluster D" }),
+        polygon(ring([NCAL[0] + 0.9, NCAL[1] - 0.2], 0.17, 0.13), { name: "Switchyard E" }),
       ],
     },
   },
@@ -108,20 +108,20 @@ export const LAYERS: LayerDef[] = [
     geojson: {
       type: "FeatureCollection",
       features: [
-        polygon(ring([SW[0] - 0.4, SW[1] - 0.3], 0.55, 0.42, 64, 0.3), {
+        polygon(ring([SCAL[0] - 0.4, SCAL[1] - 0.3], 0.55, 0.42, 64, 0.3), {
           name: "High Risk Zone — Mojave East",
           risk: "high",
         }),
-        polygon(ring([SW[0] + 1.1, SW[1] + 0.9], 0.4, 0.32, 64, -0.4), {
+        polygon(ring([SCAL[0] + 1.1, SCAL[1] + 0.9], 0.4, 0.32, 64, -0.4), {
           name: "Moderate Risk — Spring Mtn",
           risk: "moderate",
         }),
-        polygon(ring([TX[0] + 0.2, TX[1] - 0.2], 0.52, 0.36, 64, -0.2), {
-          name: "High Risk Zone — West Texas",
+        polygon(ring([CCAL[0] + 0.2, CCAL[1] - 0.2], 0.52, 0.36, 64, -0.2), {
+          name: "High Risk Zone — Central Valley",
           risk: "high",
         }),
-        polygon(ring([MW[0] - 0.5, MW[1] + 0.5], 0.35, 0.26, 64, 0.15), {
-          name: "Moderate Risk — Flint Hills",
+        polygon(ring([NCAL[0] - 0.5, NCAL[1] + 0.5], 0.35, 0.26, 64, 0.15), {
+          name: "Moderate Risk — Sierra Nevada",
           risk: "moderate",
         }),
       ],
@@ -135,19 +135,19 @@ export const LAYERS: LayerDef[] = [
     geojson: {
       type: "FeatureCollection",
       features: [
-        polygon(ring([SW[0] - 1.3, SW[1] + 0.6], 0.22, 0.18, 48, 0.2), {
+        polygon(ring([SCAL[0] - 1.3, SCAL[1] + 0.6], 0.22, 0.18, 48, 0.2), {
           name: "Census Tract 4801 — Disadvantaged",
         }),
-        polygon(ring([SW[0] + 0.2, SW[1] + 1.0], 0.2, 0.16, 48, -0.5), {
+        polygon(ring([SCAL[0] + 0.2, SCAL[1] + 1.0], 0.2, 0.16, 48, -0.5), {
           name: "Census Tract 9904 — Disadvantaged",
         }),
-        polygon(ring([SW[0] + 1.6, SW[1] - 0.9], 0.24, 0.18, 48, 0.6), {
+        polygon(ring([SCAL[0] + 1.6, SCAL[1] - 0.9], 0.24, 0.18, 48, 0.6), {
           name: "Census Tract 7712 — Disadvantaged",
         }),
-        polygon(ring([TX[0] - 1.0, TX[1] + 0.8], 0.22, 0.17, 48, -0.15), {
+        polygon(ring([CCAL[0] - 1.0, CCAL[1] + 0.8], 0.22, 0.17, 48, -0.15), {
           name: "Census Tract 6621 — Disadvantaged",
         }),
-        polygon(ring([MW[0] + 0.7, MW[1] - 0.6], 0.23, 0.17, 48, 0.22), {
+        polygon(ring([NCAL[0] + 0.7, NCAL[1] - 0.6], 0.23, 0.17, 48, 0.22), {
           name: "Census Tract 4217 — Disadvantaged",
         }),
       ],
@@ -163,6 +163,6 @@ export const LAYERS: LayerDef[] = [
 ];
 
 export const INITIAL_VIEW = {
-  center: [-98.8, 39.5] as [number, number],
-  zoom: 4.4,
+  center: [-119.4179, 36.7783] as [number, number],
+  zoom: 5.8,
 };

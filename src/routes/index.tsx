@@ -6,10 +6,11 @@ import { SpatialCopilot } from "@/components/regrid/SpatialCopilot";
 import { LeftOperationsRail } from "@/components/regrid/LeftOperationsRail";
 import { RiskScoreHUD } from "@/components/regrid/RiskScoreHUD";
 import { LAYERS } from "@/lib/regrid/layers";
+import { loadManifestLayers } from "@/lib/regrid/datasets";
 import { buildShape, distanceMeters } from "@/lib/regrid/geo";
 import { analyzeShape, findOptimalRelocation } from "@/lib/regrid/analyze";
 import { getPublicMapboxTokenFromEnv } from "@/lib/regrid/env";
-import type { AnalysisResult, Conflict, DrawnShape, LayerId, ShapeKind } from "@/lib/regrid/types";
+import type { AnalysisResult, Conflict, DrawnShape, LayerDef, LayerId, ShapeKind } from "@/lib/regrid/types";
 
 export const Route = createFileRoute("/")({
   // Mapbox/WebGL must not run during SSR — avoids blank maps after hydration.
@@ -52,6 +53,9 @@ function summarizeAvoided(before: Conflict[] | null, after: Conflict[] | null): 
   if (removed.layerId === "epa-ejscreen") return "Equity-priority overlap avoided.";
   if (removed.layerId === "hifld-transmission" || removed.layerId === "eia-grid") {
     return "Major grid conflict removed (check corridor proximity).";
+  }
+  if (typeof removed.layerId === "string" && removed.layerId.startsWith("ext:")) {
+    return "Imported dataset conflict reduced — review map highlights.";
   }
   return "Top conflict driver changed — review map highlights.";
 }
@@ -130,7 +134,7 @@ function RegridApp() {
     setAnalysisState("analyzing");
     setResult(null);
     setTimeout(() => {
-      const r = analyzeShape(shape, enabledLayers);
+      const r = analyzeShape(shape, enabledLayers, layersRef.current);
       setResult(r);
       setAnalysisState("result");
     }, 2000);
@@ -147,7 +151,7 @@ function RegridApp() {
     setTimeout(() => {
       const beforeCenter = shape.center;
       const beforeConflicts = result?.conflicts ?? null;
-      const { center, result: newResult } = findOptimalRelocation(shape, enabledLayers);
+      const { center, result: newResult } = findOptimalRelocation(shape, enabledLayers, layersRef.current);
       flyToRef.current(center, 9.2);
       setTimeout(() => {
         const newShape = buildShape(shape.kind, center, shape.radiusMeters, `shape-${Date.now()}`);
@@ -190,7 +194,31 @@ function RegridApp() {
     pulseTimerRef.current = null;
   };
 
-  const layers = useMemo(() => LAYERS, []);
+  const [layers, setLayers] = useState<LayerDef[]>(() => [...LAYERS]);
+  const layersRef = useRef(layers);
+  layersRef.current = layers;
+
+  useEffect(() => {
+    void loadManifestLayers().then((extra) => {
+      if (!extra.length) return;
+      setLayers((prev) => {
+        const seen = new Set(prev.map((l) => l.id));
+        const merged = [...prev];
+        for (const e of extra) {
+          if (!seen.has(e.id)) {
+            merged.push(e);
+            seen.add(e.id);
+          }
+        }
+        return merged;
+      });
+      setEnabledLayers((prev) => {
+        const next = new Set(prev);
+        for (const l of extra) next.add(l.id);
+        return next;
+      });
+    });
+  }, []);
 
   useEffect(() => {
     if (!relocateArmedRef.current) return;
@@ -278,6 +306,7 @@ function RegridApp() {
       </div>
 
       <SpatialCopilot
+        allLayers={layers}
         enabledLayers={enabledLayers}
         shapeKind={activeTool ?? "circle"}
         flyTo={(c, z) => flyToRef.current(c, z)}

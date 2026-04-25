@@ -21,12 +21,16 @@ export interface AnalysisResult {
   conflicts: Conflict[];
 }
 
-export type LayerId =
+/** Core demo layers shipped in the repo */
+export type BuiltinLayerId =
   | "hifld-transmission"
   | "eia-grid"
   | "usda-wildfire"
   | "epa-ejscreen"
   | "power-plants";
+
+/** Optional layers loaded at runtime from `public/datasets/manifest.json` (ids must start with `ext:`). */
+export type LayerId = BuiltinLayerId | `ext:${string}`;
 
 export interface LayerDef {
   id: LayerId;

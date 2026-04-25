@@ -1,4 +1,4 @@
-import type { AnalysisResult, DrawnShape, LayerId, ShapeKind } from "./types";
+import type { AnalysisResult, DrawnShape, LayerDef, LayerId, ShapeKind } from "./types";
 import { INITIAL_VIEW } from "./layers";
 import { buildShape } from "./geo";
 import { analyzeShape, findOptimalRelocation } from "./analyze";
@@ -11,7 +11,7 @@ export interface ParsedCopilotCommand {
   wantsWildfire: boolean;
   wantsEJ: boolean;
   wantsGrid: boolean;
-  regionHint: "southwest" | "texas" | "midwest" | "southeast" | "northeast" | null;
+  regionHint: "california" | "southwest" | "texas" | "midwest" | "southeast" | "northeast" | null;
 }
 
 export function parseCopilotCommand(text: string): ParsedCopilotCommand {
@@ -29,7 +29,9 @@ export function parseCopilotCommand(text: string): ParsedCopilotCommand {
     wantsWildfire: /\bwildfire\b|\bfire\b|\busda\b/i.test(lower),
     wantsEJ: /\bejscreen\b|\bdisadvantaged\b|\bjustice\b|\bej\b/i.test(lower),
     wantsGrid: /\beia\b|\bsubstation\b|\bswitchyard\b|\bgrid\b/i.test(lower),
-    regionHint: /\barizona\b|\baz\b|\bnevada\b|\bnv\b|\bnew\s?mexico\b|\bnm\b|\bsouthwest\b/.test(
+    regionHint: /\bcalifornia\b|\bca\b|\bnorcal\b|\bsocal\b|\bcentral valley\b/.test(lower)
+      ? "california"
+      : /\barizona\b|\baz\b|\bnevada\b|\bnv\b|\bnew\s?mexico\b|\bnm\b|\bsouthwest\b/.test(
       lower,
     )
       ? "southwest"
@@ -71,6 +73,7 @@ function delay(ms: number, signal?: AbortSignal) {
 function pickInitialCenter(parsed: ParsedCopilotCommand): [number, number] {
   // Demo uses regional synthetic data; map user hints to broad U.S. regions.
   const regionalBase: Record<NonNullable<ParsedCopilotCommand["regionHint"]>, [number, number]> = {
+    california: [-119.4179, 36.7783],
     southwest: [-111.6, 34.8],
     texas: [-100.0, 31.3],
     midwest: [-93.7, 41.6],
@@ -113,11 +116,12 @@ export interface CopilotRunHandlers {
 export async function runSpatialCopilotDemo(args: {
   command: string;
   enabledLayers: Set<LayerId>;
+  allLayers: LayerDef[];
   shapeKind: ShapeKind;
   signal?: AbortSignal;
   handlers: CopilotRunHandlers;
 }): Promise<void> {
-  const { command, enabledLayers: userEnabled, shapeKind, signal, handlers } = args;
+  const { command, enabledLayers: userEnabled, allLayers, shapeKind, signal, handlers } = args;
   const { onLog, onFly, onShape, onAnalysis } = handlers;
 
   const parsed = parseCopilotCommand(command);
@@ -146,7 +150,7 @@ export async function runSpatialCopilotDemo(args: {
   const runEvaluate = (label: string) => {
     const shape = buildShape(shapeKind, center, radiusMeters, `copilot-${Date.now()}`);
     onShape(shape);
-    const result = analyzeShape(shape, enabled);
+    const result = analyzeShape(shape, enabled, allLayers);
     onAnalysis(result);
     onLog(`result · ${label} · risk=${result.score} · ${summarizeConflicts(result)}`);
     return { shape, result };
@@ -191,7 +195,7 @@ export async function runSpatialCopilotDemo(args: {
 
   onLog("tool · grid_search_relocate { radius_km: 30, step_deg: 30 }");
   await delay(320, signal);
-  const relocated = findOptimalRelocation(shape, enabled);
+  const relocated = findOptimalRelocation(shape, enabled, allLayers);
   center = relocated.center;
   onFly(center, 9.2);
   const finalShape = buildShape(shapeKind, center, radiusMeters, `copilot-${Date.now()}`);
@@ -202,10 +206,11 @@ export async function runSpatialCopilotDemo(args: {
   await delay(320, signal);
 
   if (finalResult.score > maxRisk) {
-    onLog("decision · enforce_user_risk_ceiling (demo clamp)");
+    onLog("decision · best_candidate_exceeds_risk_ceiling");
     await delay(220, signal);
-    finalResult = { score: Math.max(0, maxRisk - 3), conflicts: [] };
-    onAnalysis(finalResult);
+  } else {
+    onLog("decision · candidate_meets_risk_criteria");
+    await delay(220, signal);
   }
 
   onLog("decision · candidate_selected");

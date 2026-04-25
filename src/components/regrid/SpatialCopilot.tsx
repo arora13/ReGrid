@@ -1,10 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AnalysisResult, DrawnShape, LayerId, ShapeKind } from "@/lib/regrid/types";
+import type { AnalysisResult, DrawnShape, LayerDef, LayerId, ShapeKind } from "@/lib/regrid/types";
 import { runSpatialCopilotDemo } from "@/lib/regrid/copilot";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface SpatialCopilotProps {
+  allLayers: LayerDef[];
   enabledLayers: Set<LayerId>;
   shapeKind: ShapeKind;
   flyTo: (center: [number, number], zoom?: number) => void;
@@ -14,6 +15,7 @@ interface SpatialCopilotProps {
 }
 
 export function SpatialCopilot({
+  allLayers,
   enabledLayers,
   shapeKind,
   flyTo,
@@ -24,7 +26,7 @@ export function SpatialCopilot({
   const [open, setOpen] = useState(false);
   const [chipsOpen, setChipsOpen] = useState(false);
   const [command, setCommand] = useState(
-    "Find me a 50 acre site near transmission with a risk score under 20 anywhere in the U.S.",
+    "Find me a 50 acre site near transmission with a risk score under 20 anywhere in California.",
   );
   const [log, setLog] = useState<string[]>(["system · copilot_ready · bounded_tool_loop=true"]);
   const [running, setRunning] = useState(false);
@@ -45,9 +47,9 @@ export function SpatialCopilot({
 
   const MISSION_CHIPS = useMemo(
     () => [
-      "50 acres near transmission in Texas, risk under 20",
-      "Battery site in Texas: avoid wildfire + EJ overlap, risk under 25",
-      "Grid-tied solar in the Midwest: prioritize transmission access, risk under 35",
+      "50 acres near transmission in California, risk under 20",
+      "Battery site in SoCal: avoid wildfire + EJ overlap, risk under 25",
+      "Grid-tied solar in NorCal: prioritize transmission access, risk under 35",
     ],
     [],
   );
@@ -65,6 +67,7 @@ export function SpatialCopilot({
       await runSpatialCopilotDemo({
         command,
         enabledLayers,
+        allLayers,
         shapeKind,
         signal: ac.signal,
         handlers: {
@@ -94,8 +97,8 @@ export function SpatialCopilot({
   };
 
   return (
-    <div className="pointer-events-none z-30 shrink-0 border-t border-white/[0.08] bg-gradient-to-t from-background via-background/95 to-background/80 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
-      <div className="pointer-events-auto mx-auto w-full max-w-[920px] px-1 sm:px-2">
+    <div className="pointer-events-none absolute bottom-6 left-1/2 z-30 w-full max-w-[500px] -translate-x-1/2 px-4">
+      <div className="pointer-events-auto mx-auto w-full max-w-[500px] px-1 sm:px-2">
         <motion.div
           layout
           className="glass overflow-hidden rounded-2xl border border-white/[0.08] shadow-sm"
@@ -164,7 +167,7 @@ export function SpatialCopilot({
               onChange={(e) => setCommand(e.target.value)}
               disabled={running}
               className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/25"
-              placeholder='Try: "50 acres near transmission in Texas, risk under 20"'
+              placeholder='Try: "50 acres near transmission in California, risk under 20"'
             />
             <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
               <button
