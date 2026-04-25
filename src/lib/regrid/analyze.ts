@@ -47,12 +47,25 @@ const LAYER_LABELS: Record<LayerId, { hit: string; near: string }> = {
   },
 };
 
+function stable01(seed: string): number {
+  // Deterministic pseudo-random in [0, 1) for repeatable hackathon demos.
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const x = h >>> 0;
+  return (x % 1_000_000) / 1_000_000;
+}
+
 export function analyzeShape(
   shape: DrawnShape,
   enabled: Set<LayerId>,
 ): AnalysisResult {
   const conflicts: Conflict[] = [];
-  let score = 8 + Math.random() * 6; // baseline noise
+  const enabledKey = Array.from(enabled).sort().join(",");
+  const seed = `${enabledKey}|${shape.center[0].toFixed(5)},${shape.center[1].toFixed(5)}|${shape.radiusMeters}|${shape.kind}`;
+  let score = 8 + stable01(seed) * 6; // baseline variation (deterministic)
 
   for (const layer of LAYERS) {
     if (!enabled.has(layer.id)) continue;

@@ -44,7 +44,7 @@ export function ToolPalette({ active, onSelect, onClear, hasShape }: ToolPalette
       initial={{ y: 40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
-      className="pointer-events-auto absolute bottom-8 left-1/2 z-20 -translate-x-1/2"
+      className="pointer-events-auto absolute bottom-52 left-1/2 z-20 -translate-x-1/2"
     >
       <div className="glass-strong flex items-center gap-2 rounded-2xl p-2">
         <div className="px-3 py-2">

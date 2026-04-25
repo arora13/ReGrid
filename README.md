@@ -4,6 +4,8 @@
 
 ReGrid is an interactive siting intelligence platform for clean energy developers. Users can place a candidate project footprint (circle, square, hexagon), run spatial conflict analysis against federal-style layers, and get an optimization recommendation that relocates the site to a lower-risk area.
 
+ReGrid also includes a **hackathon-grade Spatial Copilot**: a bottom command bar that accepts a natural-language mission, streams a terminal-style trace while it runs a **bounded “tool loop”** (evaluate → explain → adjust → grid search), then **flies the map** and drops the footprint automatically.
+
 The product experience is a full-screen dark map interface with glassmorphism controls, real-time layer toggles, and animated risk analytics designed to feel enterprise-grade and demo-ready.
 
 ## Demo Flow
@@ -12,14 +14,17 @@ The product experience is a full-screen dark map interface with glassmorphism co
 2. **Propose** - Choose a shape tool, click the map, and place a project footprint.
 3. **Analyze** - Run conflict scoring to compute a 0-100 siting risk score.
 4. **Optimize** - Trigger AI Auto-Relocate to search nearby alternatives and animate to a better site.
+5. **Copilot** - Type a mission in the bottom command bar, watch the streamed trace, and let the agent finish with a fly-to reveal.
 
 ## Product Architecture
 
 ```mermaid
 flowchart LR
     U[User] --> FE[Frontend App\nTanStack Start + React + Tailwind + Mapbox GL]
+    U --> CP[Spatial Copilot\nbounded demo loop + trace]
     FE --> CE[Conflict Engine\nClient-side simulation]
     FE --> MAP[Mapbox APIs]
+    CP --> CE
     CE --> LAYERS[Mock Federal GeoJSON Layers]
     CE --> SCORE[Risk Score + Conflict List]
     SCORE --> UI[Risk Panel + Recommendations]
@@ -64,6 +69,7 @@ Current implementation simulates conflict analysis in-app:
 
 - Layer overlap/proximity weighting per active dataset
 - Risk scoring from 0-100 with severity bands
+- Deterministic baseline scoring (stable across reruns for the same site + active layers)
 - Conflict list generation for the right-side Risk Panel
 - AI Auto-Relocate simulation that searches nearby coordinates and returns a better score
 
@@ -124,19 +130,21 @@ VITE_SPATIAL_API_URL=http://localhost:8000
 ## Local Development
 
 ```bash
-bun install
-bun run dev
+npm install
+npm run dev
 ```
 
-Open the app, provide a Mapbox token in the token gate, then:
+Open the app. If `VITE_MAPBOX_TOKEN` is set in `.env.local`, the map loads immediately; otherwise paste a token in the gate, then:
 - Toggle layers in the left panel
 - Place a shape on map click
 - Analyze risk
 - Auto-relocate for optimized siting
+- Run the Spatial Copilot from the bottom command bar
 
 ## Current Status
 
 - UI and interaction model are implemented and polished.
+- Spatial Copilot (demo) is implemented client-side with streamed logs + fly-to choreography.
 - Conflict analysis is currently simulated client-side for demo speed.
 - Convex/FastAPI/data pipeline integration is the next milestone.
 

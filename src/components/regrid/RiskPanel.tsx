@@ -24,7 +24,7 @@ export function RiskPanel({
       initial={{ x: 40, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="glass-strong pointer-events-auto absolute top-24 right-6 bottom-28 z-20 flex w-[380px] flex-col rounded-2xl"
+      className="glass-strong pointer-events-auto absolute top-24 right-6 bottom-56 z-20 flex w-[380px] flex-col rounded-2xl"
     >
       <div className="border-b border-white/[0.06] p-5">
         <p className="font-mono text-[10px] tracking-[0.25em] text-primary/80 uppercase">

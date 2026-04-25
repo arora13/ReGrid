@@ -6,6 +6,7 @@ import { ToolPalette } from "@/components/regrid/ToolPalette";
 import { RiskPanel } from "@/components/regrid/RiskPanel";
 import { TopBar } from "@/components/regrid/TopBar";
 import { TokenGate } from "@/components/regrid/TokenGate";
+import { SpatialCopilot } from "@/components/regrid/SpatialCopilot";
 import { LAYERS } from "@/lib/regrid/layers";
 import { buildShape } from "@/lib/regrid/geo";
 import { analyzeShape, findOptimalRelocation } from "@/lib/regrid/analyze";
@@ -61,6 +62,7 @@ function RegridApp() {
   const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [highlightedConflict, setHighlightedConflict] = useState<LayerId | null>(null);
+  const [copilotRunning, setCopilotRunning] = useState(false);
 
   const flyToRef = useRef<(c: [number, number], z?: number) => void>(() => {});
 
@@ -68,6 +70,7 @@ function RegridApp() {
     kind === "circle" ? 6500 : kind === "square" ? 6800 : 7200;
 
   const handleMapClick = (lngLat: [number, number]) => {
+    if (copilotRunning) return;
     if (!activeTool) return;
     const id = `shape-${Date.now()}`;
     const next = buildShape(activeTool, lngLat, radiusForKind(activeTool), id);
@@ -182,6 +185,21 @@ function RegridApp() {
         onSelect={setActiveTool}
         onClear={handleClear}
         hasShape={!!shape}
+      />
+
+      <SpatialCopilot
+        enabledLayers={enabledLayers}
+        shapeKind={activeTool ?? "circle"}
+        flyTo={(c, z) => flyToRef.current(c, z)}
+        onCopilotRunningChange={setCopilotRunning}
+        onApplyShape={(next) => {
+          setShape(next);
+          setHighlightedConflict(null);
+        }}
+        onApplyAnalysis={(next) => {
+          setResult(next);
+          setAnalysisState(next ? "result" : "idle");
+        }}
       />
     </div>
   );
