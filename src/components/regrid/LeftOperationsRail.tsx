@@ -5,6 +5,11 @@ import { useMemo } from "react";
 
 export type { ProjectKind } from "@/lib/regrid/types";
 
+function layerRowTooltip(layer: LayerDef): string {
+  if (layer.hoverHelp) return layer.hoverHelp;
+  return `Checked: draws "${layer.name}" on the map and includes it in the siting score. Unchecked: hides that overlay and removes it from scoring (${layer.agency}).`;
+}
+
 interface LeftOperationsRailProps {
   layers: LayerDef[];
   enabledLayers: Set<LayerId>;
@@ -169,7 +174,10 @@ export function LeftOperationsRail({
             const on = enabledLayers.has(layer.id);
             return (
               <li key={layer.id}>
-                <label className="flex cursor-pointer items-center gap-3 rounded-md px-1 py-1.5 transition hover:bg-white/[0.04]">
+                <label
+                  className="flex cursor-help items-center gap-3 rounded-md px-1 py-1.5 transition hover:bg-white/[0.04]"
+                  title={layerRowTooltip(layer)}
+                >
                   <input
                     type="checkbox"
                     checked={on}

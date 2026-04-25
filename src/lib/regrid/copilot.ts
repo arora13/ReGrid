@@ -1,7 +1,12 @@
 import type { AnalysisResult, DrawnShape, LayerDef, LayerId, ShapeKind } from "./types";
 import { INITIAL_VIEW } from "./layers";
-import { buildShape } from "./geo";
+import { buildShape, distanceMeters } from "./geo";
 import { analyzeShape, findOptimalRelocation } from "./analyze";
+import { clampLngLatToCalifornia } from "./california";
+import { matchCaliforniaPlaceHint } from "./californiaPlaces";
+
+/** In-state seed only; prompts outside CA vocabulary still land in California. */
+export type CaliforniaSubregion = "norcal" | "socal" | "central" | null;
 
 export interface ParsedCopilotCommand {
   raw: string;
@@ -11,7 +16,28 @@ export interface ParsedCopilotCommand {
   wantsWildfire: boolean;
   wantsEJ: boolean;
   wantsGrid: boolean;
-  regionHint: "california" | "southwest" | "texas" | "midwest" | "southeast" | "northeast" | null;
+  caSubregion: CaliforniaSubregion;
+  /** Demo anchor from place-name regexes — not full geocoding. */
+  placeMatch: { center: [number, number]; label: string } | null;
+  /** When intent came from the LLM and `mentionsWind` was true (no literal "wind" required). */
+  llmWindHint?: boolean;
+  /**
+   * When set, scoring uses only these builtin layer ids (plus any `ext:` layers the user already enabled).
+   * When unset, the usual `defaultEnabledLayers` merge applies.
+   */
+  structuredLayerFocus?: LayerId[] | null;
+}
+
+export function parseCaliforniaSubregion(lower: string): CaliforniaSubregion {
+  if (/\b(socal|los angeles|san diego|orange county)\b/.test(lower)) return "socal";
+  if (/\b(central valley|fresno|bakersfield|sacramento)\b/.test(lower)) return "central";
+  if (
+    /\b(norcal|bay area|silicon valley|san francisco)\b/.test(lower) ||
+    /\bsf bay\b/.test(lower)
+  ) {
+    return "norcal";
+  }
+  return null;
 }
 
 export function parseCopilotCommand(text: string): ParsedCopilotCommand {
@@ -20,35 +46,21 @@ export function parseCopilotCommand(text: string): ParsedCopilotCommand {
 
   const acresMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:acre|acres)\b/);
   const riskMatch = lower.match(/(?:risk|score)\s*(?:under|below|<|<=)\s*(\d{1,3})\b/);
+  const placeMatch = matchCaliforniaPlaceHint(lower);
 
   return {
     raw,
     acres: acresMatch ? Number(acresMatch[1]) : null,
     maxRisk: riskMatch ? Number(riskMatch[1]) : null,
     wantsTransmission: /\btransmission\b|\bhifld\b|\bpower\s*line\b|\bgrid\s*line\b/i.test(lower),
-    wantsWildfire: /\bwildfire\b|\bfire\b|\busda\b/i.test(lower),
+    wantsWildfire:
+      /\bwildfire\b|\bfire\b|\busda\b|\bwind[\s-]*risk\b|\bwind\b.*\b(risk|exposure|hazard)\b/i.test(
+        lower,
+      ),
     wantsEJ: /\bejscreen\b|\bdisadvantaged\b|\bjustice\b|\bej\b/i.test(lower),
     wantsGrid: /\beia\b|\bsubstation\b|\bswitchyard\b|\bgrid\b/i.test(lower),
-    regionHint:
-      /\bcalifornia\b|\bclaifornia\b|\bcalif\.?\b|\bin\s+ca\b|\bnorcal\b|\bsocal\b|\bcentral valley\b|\bsilicon valley\b|\bsf bay\b|\blos angeles\b|\bsan diego\b|\bsacramento\b|\bfresno\b|\bbay area\b/.test(
-        lower,
-      )
-      ? "california"
-      : /\barizona\b|\baz\b|\bnevada\b|\bnv\b|\bnew\s?mexico\b|\bnm\b|\bsouthwest\b/.test(
-      lower,
-    )
-      ? "southwest"
-      : /\btexas\b|\btx\b/.test(lower)
-        ? "texas"
-        : /\bmidwest\b|\billinois\b|\bil\b|\biowa\b|\bio\b|\bminnesota\b|\bmn\b|\bkansas\b|\bks\b/.test(
-              lower,
-            )
-          ? "midwest"
-          : /\bgeorgia\b|\bga\b|\bflorida\b|\bfl\b|\bcarolina\b|\bsoutheast\b/.test(lower)
-            ? "southeast"
-            : /\bnew\s?york\b|\bny\b|\bpennsylvania\b|\bpa\b|\bnortheast\b/.test(lower)
-              ? "northeast"
-              : null,
+    caSubregion: parseCaliforniaSubregion(lower),
+    placeMatch,
   };
 }
 
@@ -73,41 +85,35 @@ function delay(ms: number, signal?: AbortSignal) {
   });
 }
 
-function pickFlyZoom(regionHint: ParsedCopilotCommand["regionHint"]): number {
-  switch (regionHint) {
-    case "california":
-      return 6.35;
-    case "southwest":
-      return 6.15;
-    case "texas":
-      return 6.05;
-    case "midwest":
-      return 5.9;
-    case "southeast":
-      return 5.95;
-    case "northeast":
-      return 5.9;
+function pickFlyZoom(parsed: ParsedCopilotCommand): number {
+  if (parsed.placeMatch) return 8.35;
+  switch (parsed.caSubregion) {
+    case "norcal":
+      return 6.45;
+    case "socal":
+      return 6.55;
+    case "central":
+      return 6.4;
     default:
-      return Math.max(5.6, INITIAL_VIEW.zoom);
+      return Math.max(5.65, INITIAL_VIEW.zoom);
   }
 }
 
 function pickInitialCenter(parsed: ParsedCopilotCommand): [number, number] {
-  // Demo uses regional synthetic data; map user hints to broad U.S. regions.
-  const regionalBase: Record<NonNullable<ParsedCopilotCommand["regionHint"]>, [number, number]> = {
-    california: [-119.4179, 36.7783],
-    southwest: [-111.6, 34.8],
-    texas: [-100.0, 31.3],
-    midwest: [-93.7, 41.6],
-    southeast: [-84.6, 33.5],
-    northeast: [-74.7, 41.2],
+  if (parsed.placeMatch) {
+    const base = parsed.placeMatch.center;
+    const eastBias = parsed.wantsTransmission ? 0.025 : 0;
+    return clampLngLatToCalifornia([base[0] + eastBias, base[1]]);
+  }
+  const statewide = INITIAL_VIEW.center;
+  const seeds: Record<NonNullable<CaliforniaSubregion>, [number, number]> = {
+    norcal: [-122.35, 39.15],
+    central: [-119.55, 36.35],
+    socal: [-118.15, 34.05],
   };
-  const base = parsed.regionHint ? regionalBase[parsed.regionHint] : INITIAL_VIEW.center;
-  // Nudge toward likely corridor overlays for transmission-focused prompts.
-  const eastBias = parsed.wantsTransmission ? 0.16 : 0.05;
-  const northBias =
-    parsed.regionHint === "southeast" ? -0.04 : parsed.regionHint === "northeast" ? 0.04 : 0.0;
-  return [base[0] + eastBias, base[1] + northBias];
+  const base = parsed.caSubregion ? seeds[parsed.caSubregion] : statewide;
+  const eastBias = parsed.wantsTransmission ? 0.12 : 0.04;
+  return clampLngLatToCalifornia([base[0] + eastBias, base[1]]);
 }
 
 function defaultEnabledLayers(parsed: ParsedCopilotCommand): Set<LayerId> {
@@ -128,6 +134,182 @@ function summarizeConflicts(result: AnalysisResult): string {
     .join(" · ");
 }
 
+function whereDescription(parsed: ParsedCopilotCommand): string {
+  if (parsed.placeMatch) return `near ${parsed.placeMatch.label.replace(/_/g, " ")}`;
+  switch (parsed.caSubregion) {
+    case "norcal":
+      return "Northern California demo area";
+    case "socal":
+      return "Southern California demo area";
+    case "central":
+      return "Central Valley demo area";
+    default: {
+      const lc = parsed.raw.toLowerCase();
+      if (/\bcalifornia\b|\bcalif\.?\b/.test(lc)) {
+        return "California — statewide anchor (add a city, e.g. Pomona or Fresno, to lock the map tighter)";
+      }
+      return "California (statewide demo anchor)";
+    }
+  }
+}
+
+export function windMentioned(parsed: ParsedCopilotCommand): boolean {
+  if (/\bsolar\b/i.test(parsed.raw)) return false;
+  if (parsed.llmWindHint) return true;
+  return /\bwind\b/i.test(parsed.raw);
+}
+
+/** 8-wind compass from `from` → `to` (degrees of rotation). */
+function compass8(from: [number, number], to: [number, number]): string {
+  const lat1 = (from[1] * Math.PI) / 180;
+  const dLng = ((to[0] - from[0]) * Math.PI) / 180;
+  const dLat = ((to[1] - from[1]) * Math.PI) / 180;
+  const x = dLng * Math.cos(lat1);
+  const deg = (Math.atan2(x, dLat) * 180) / Math.PI;
+  const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const i = ((Math.round(deg / 45) % 8) + 8) % 8;
+  return dirs[i];
+}
+
+export type WindPlaceSpatialVariant = "improved_away" | "micro_shift" | "tie_no_better";
+
+export interface WindPlaceNearestMockMeta {
+  /** Title-case place name for sentences. */
+  placeTitle: string;
+  anchorScore: number;
+  bestScore: number;
+  km: number;
+  compass: string;
+  spatialVariant: WindPlaceSpatialVariant;
+}
+
+/**
+ * From the named city center, find lowest mock spatial score within ~150 km.
+ * Updates map/analysis to that point. Not wind engineering.
+ */
+export function applyWindPlaceNearestMockDemo(args: {
+  parsed: ParsedCopilotCommand;
+  shapeKind: ShapeKind;
+  radiusMeters: number;
+  enabled: Set<LayerId>;
+  allLayers: LayerDef[];
+  onShape: CopilotRunHandlers["onShape"];
+  onAnalysis: CopilotRunHandlers["onAnalysis"];
+  onFly: CopilotRunHandlers["onFly"];
+  onLog: CopilotRunHandlers["onLog"];
+}): { meta: WindPlaceNearestMockMeta; result: AnalysisResult } {
+  const { parsed, shapeKind, radiusMeters, enabled, allLayers, onShape, onAnalysis, onFly, onLog } =
+    args;
+  const pm = parsed.placeMatch!;
+  const anchorCenter = clampLngLatToCalifornia(pm.center);
+  const placeTitle = pm.label.replace(/_/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase());
+  const anchorShape = buildShape(
+    shapeKind,
+    anchorCenter,
+    radiusMeters,
+    `wind-anchor-${Date.now()}`,
+  );
+  const anchorRes = analyzeShape(anchorShape, enabled, allLayers);
+  const wide = findOptimalRelocation(anchorShape, enabled, allLayers, { maxOffsetDeg: 1.35 });
+  const km = distanceMeters(anchorCenter, wide.center) / 1000;
+  const compass = compass8(anchorCenter, wide.center);
+  const improved = wide.result.score < anchorRes.score - 0.001;
+  const spatialVariant: WindPlaceSpatialVariant =
+    improved && km >= 2.5
+      ? "improved_away"
+      : improved && km < 2.5
+        ? "micro_shift"
+        : "tie_no_better";
+
+  const placed = buildShape(shapeKind, wide.center, radiusMeters, `wind-place-${Date.now()}`);
+  onShape(placed);
+  onAnalysis(wide.result);
+  onFly(wide.center, 8.65);
+  onLog(
+    `result · wind_place_nearest_mock_ring · variant=${spatialVariant} · anchor_score=${anchorRes.score} · best_in_ring=${wide.result.score} · d_km=${km.toFixed(1)} · dir=${compass}`,
+  );
+
+  return {
+    meta: {
+      placeTitle,
+      anchorScore: anchorRes.score,
+      bestScore: wide.result.score,
+      km,
+      compass,
+      spatialVariant,
+    },
+    result: wide.result,
+  };
+}
+
+export function buildWindPlaceUserAnswer(
+  parsed: ParsedCopilotCommand,
+  result: AnalysisResult,
+  acres: number,
+  meta: WindPlaceNearestMockMeta,
+): string {
+  const ac = Math.round(acres);
+  const p = meta.placeTitle;
+  const tail =
+    result.conflicts.length === 0
+      ? `The marker scores ${result.score}/100 on the checked demo layers (no overlaps flagged).`
+      : `The marker scores ${result.score}/100; strongest drivers: ${result.conflicts
+          .slice(0, 2)
+          .map((c) => c.label)
+          .join("; ")}.`;
+
+  const head = `There is no lowest wind-risk site answer near ${p}: wind turbines, wakes, and wind resource are not modeled, so "wind risk" cannot be ranked. `;
+
+  let mid: string;
+  switch (meta.spatialVariant) {
+    case "improved_away":
+      mid = `What we can do instead (mock transmission, wildfire, equity only): the lowest siting score we found within ~150 km of ${p} is about ${meta.km.toFixed(0)} km ${meta.compass} of the city center (${meta.bestScore}/100 vs ${meta.anchorScore}/100 at the anchor). The map is centered there. That is not a wind-safety conclusion. `;
+      break;
+    case "micro_shift":
+      mid = `On those same demo layers, a small shift changes the mock score from ${meta.anchorScore}/100 to ${meta.bestScore}/100. That is toy-geometry sensitivity, not a discoverable "nearest wind site." `;
+      break;
+    default:
+      mid = `On those demo layers we did not find any footprint that scores lower than the city anchor within ~150 km (search best matches the anchor at about ${meta.anchorScore}/100). So there is no separate "nearest better" spot to name — only this mock score. `;
+      break;
+  }
+
+  return `${head}${mid}${tail} About ${ac} ac; demo only.`.replace(/\s+/g, " ").trim();
+}
+
+/** Plain-language summary for the UI — not legal or engineering advice. */
+export function buildCopilotUserAnswer(
+  parsed: ParsedCopilotCommand,
+  result: AnalysisResult,
+  acres: number,
+): string {
+  const isWind = windMentioned(parsed);
+  const where = whereDescription(parsed);
+  const ac = Math.round(acres);
+  const placement = `Demo footprint ~${ac} ac (${where}).`;
+
+  const scorePart =
+    result.conflicts.length === 0
+      ? `On the layers that are on, the siting score is ${result.score}/100 with no overlaps (mock geometry only).`
+      : `On the layers that are on, the siting score is ${result.score}/100. Top drivers: ${result.conflicts
+          .slice(0, 2)
+          .map((c) => c.label)
+          .join("; ")}.`;
+
+  if (isWind) {
+    return (
+      `Direct answer: there is no valid "lowest wind-risk site" result in this build — wind turbines, wakes, and wind resource are not modeled, so ranking wind risk would be meaningless. ` +
+      `${placement} What we did instead is score only mock transmission, wildfire, and equity shapes: ${scorePart} ` +
+      `That number is not a wind study; it is a rough spatial sketch on demo data.`
+    )
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  return `Direct answer: ${placement} ${scorePart} Not a permit decision — demo data only.`
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export interface CopilotRunHandlers {
   onLog: (line: string) => void;
   onFly: (center: [number, number], zoom?: number) => void;
@@ -135,18 +317,17 @@ export interface CopilotRunHandlers {
   onAnalysis: (result: AnalysisResult | null) => void;
 }
 
-export async function runSpatialCopilotDemo(args: {
-  command: string;
+export async function runSpatialCopilotFromParsed(args: {
+  parsed: ParsedCopilotCommand;
   enabledLayers: Set<LayerId>;
   allLayers: LayerDef[];
   shapeKind: ShapeKind;
   signal?: AbortSignal;
   handlers: CopilotRunHandlers;
-}): Promise<void> {
-  const { command, enabledLayers: userEnabled, allLayers, shapeKind, signal, handlers } = args;
+}): Promise<string> {
+  const { parsed, enabledLayers: userEnabled, allLayers, shapeKind, signal, handlers } = args;
   const { onLog, onFly, onShape, onAnalysis } = handlers;
 
-  const parsed = parseCopilotCommand(command);
   const maxRisk = parsed.maxRisk ?? 25;
   const acres = parsed.acres ?? 50;
   const radiusMeters = acresToRadiusMeters(acres);
@@ -154,22 +335,59 @@ export async function runSpatialCopilotDemo(args: {
   onLog("receipt · mission_received");
   await delay(220, signal);
   onLog(
-    `receipt · constraints_parsed · acres=${acres.toFixed(0)} · max_risk=${maxRisk} · region=${
-      parsed.regionHint ?? "viewport"
+    `receipt · constraints_parsed · acres=${acres.toFixed(0)} · max_risk=${maxRisk} · region=california${
+      parsed.placeMatch
+        ? ` · place=${parsed.placeMatch.label}`
+        : parsed.caSubregion
+          ? ` · sub=${parsed.caSubregion}`
+          : ""
     } · focus=${
       parsed.wantsTransmission ? "transmission " : ""
     }${parsed.wantsWildfire ? "wildfire " : ""}${parsed.wantsEJ ? "equity " : ""}${parsed.wantsGrid ? "grid " : ""}`.trim(),
   );
+  const cmdLc = parsed.raw.toLowerCase();
+  if (windMentioned(parsed)) {
+    onLog(
+      "notice · wind_generation_not_modeled · spatial_score_is_mock_transmission_wildfire_equity_only",
+    );
+  }
   await delay(220, signal);
 
   const enabled = new Set<LayerId>(userEnabled);
-  for (const id of defaultEnabledLayers(parsed)) enabled.add(id);
+  const narrow = parsed.structuredLayerFocus?.filter(Boolean) ?? [];
+  if (narrow.length > 0) {
+    const allowed = new Set<LayerId>(narrow);
+    for (const id of userEnabled) {
+      if (typeof id === "string" && id.startsWith("ext:")) allowed.add(id);
+    }
+    for (const id of allowed) enabled.add(id);
+  } else {
+    for (const id of defaultEnabledLayers(parsed)) enabled.add(id);
+  }
+
+  const finishRun = (finalResult: AnalysisResult): string => {
+    if (windMentioned(parsed) && parsed.placeMatch) {
+      const { meta, result: r } = applyWindPlaceNearestMockDemo({
+        parsed,
+        shapeKind,
+        radiusMeters,
+        enabled,
+        allLayers,
+        onShape,
+        onAnalysis,
+        onFly,
+        onLog,
+      });
+      return buildWindPlaceUserAnswer(parsed, r, acres, meta);
+    }
+    return buildCopilotUserAnswer(parsed, finalResult, acres);
+  };
 
   onLog("tool · calculate_site_risk { footprint, active_layers }");
   await delay(260, signal);
 
   let center = pickInitialCenter(parsed);
-  onFly(center, pickFlyZoom(parsed.regionHint));
+  onFly(center, pickFlyZoom(parsed));
 
   const runEvaluate = (label: string) => {
     const shape = buildShape(shapeKind, center, radiusMeters, `copilot-${Date.now()}`);
@@ -187,22 +405,28 @@ export async function runSpatialCopilotDemo(args: {
     onLog("decision · seed_within_budget");
     await delay(220, signal);
     onLog("action · publish_candidate");
-    return;
+    return finishRun(result);
   }
 
   const worst = result.conflicts.find((c) => c.severity === "high") ?? result.conflicts[0];
   if (worst?.layerId === "usda-wildfire") {
-    onLog("analysis · high_wildfire_exposure → shift_west");
+    // Large nudges break "near {city}" intent; stay tight when a place anchor matched.
+    const shift = parsed.placeMatch ? 0.022 : 0.12;
+    onLog(
+      parsed.placeMatch
+        ? "analysis · high_wildfire_exposure → micro_shift (place_anchor)"
+        : "analysis · high_wildfire_exposure → shift_west",
+    );
     await delay(280, signal);
-    center = [center[0] - 0.12, center[1] + 0.01];
-    onFly(center, Math.min(8.6, pickFlyZoom(parsed.regionHint) + 2.0));
+    center = clampLngLatToCalifornia([center[0] - shift, center[1] + 0.008]);
+    onFly(center, Math.min(8.6, pickFlyZoom(parsed) + 2.0));
     ({ shape, result } = runEvaluate("evaluate #2 (west shift)"));
     await delay(320, signal);
   } else if (worst?.layerId === "hifld-transmission" || parsed.wantsTransmission) {
     onLog("analysis · transmission_proximity_ok → micro_adjust_anchor");
     await delay(260, signal);
-    center = [center[0] - 0.04, center[1] + 0.06];
-    onFly(center, Math.min(8.6, pickFlyZoom(parsed.regionHint) + 2.0));
+    center = clampLngLatToCalifornia([center[0] - 0.04, center[1] + 0.06]);
+    onFly(center, Math.min(8.6, pickFlyZoom(parsed) + 2.0));
     ({ shape, result } = runEvaluate("evaluate #2 (micro-adjust)"));
     await delay(320, signal);
   } else {
@@ -214,19 +438,27 @@ export async function runSpatialCopilotDemo(args: {
     onLog("decision · post_adjustment_within_budget");
     await delay(220, signal);
     onLog("action · publish_candidate");
-    return;
+    return finishRun(result);
   }
 
-  onLog("tool · grid_search_relocate { radius_km: 30, step_deg: 30 }");
+  // Tight disk for named cities (~15–20 km); wider for generic CA prompts.
+  const relocRadiusDeg = parsed.placeMatch ? 0.16 : 1.05;
+  onLog(
+    `tool · grid_search_relocate { step_deg: 30, max_offset_deg: ${relocRadiusDeg.toFixed(2)} from_seed }`,
+  );
   await delay(320, signal);
-  const relocated = findOptimalRelocation(shape, enabled, allLayers);
-  center = relocated.center;
+  const relocated = findOptimalRelocation(shape, enabled, allLayers, {
+    maxOffsetDeg: relocRadiusDeg,
+  });
+  center = clampLngLatToCalifornia(relocated.center);
   onFly(center, 9.2);
   const finalShape = buildShape(shapeKind, center, radiusMeters, `copilot-${Date.now()}`);
   onShape(finalShape);
-  let finalResult = relocated.result;
+  const finalResult = relocated.result;
 
-  onLog(`result · grid_search_best · risk=${finalResult.score} · ${summarizeConflicts(finalResult)}`);
+  onLog(
+    `result · grid_search_best · risk=${finalResult.score} · ${summarizeConflicts(finalResult)}`,
+  );
   await delay(320, signal);
 
   if (finalResult.score > maxRisk) {
@@ -240,4 +472,17 @@ export async function runSpatialCopilotDemo(args: {
   onLog("decision · candidate_selected");
   await delay(200, signal);
   onLog("ui · fly_to_candidate + render_footprint");
+  return finishRun(finalResult);
+}
+
+export async function runSpatialCopilotDemo(args: {
+  command: string;
+  enabledLayers: Set<LayerId>;
+  allLayers: LayerDef[];
+  shapeKind: ShapeKind;
+  signal?: AbortSignal;
+  handlers: CopilotRunHandlers;
+}): Promise<string> {
+  const parsed = parseCopilotCommand(args.command);
+  return runSpatialCopilotFromParsed({ ...args, parsed });
 }

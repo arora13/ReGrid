@@ -17,6 +17,7 @@ export type DatasetManifest = {
     agency?: string;
     color?: string;
     geojsonUrl: string;
+    hoverHelp?: string;
   }>;
 };
 
@@ -58,6 +59,7 @@ export async function loadManifestLayers(): Promise<LayerDef[]> {
         agency: spec.agency ?? "External dataset",
         color: spec.color ?? "#84cc16",
         geojson: data,
+        ...(spec.hoverHelp ? { hoverHelp: spec.hoverHelp } : {}),
       });
     }
 

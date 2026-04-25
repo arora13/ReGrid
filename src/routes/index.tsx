@@ -8,6 +8,7 @@ import { RiskScoreHUD } from "@/components/regrid/RiskScoreHUD";
 import { WorkspaceHeader, workspaceProjectLabel } from "@/components/regrid/WorkspaceHeader";
 import { LAYERS } from "@/lib/regrid/layers";
 import { loadManifestLayers } from "@/lib/regrid/datasets";
+import { clampLngLatToCalifornia, LOCAL_RELOCATE_MAX_OFFSET_DEG } from "@/lib/regrid/california";
 import { buildShape, distanceMeters } from "@/lib/regrid/geo";
 import { analyzeShape, findOptimalRelocation } from "@/lib/regrid/analyze";
 import { getPublicMapboxTokenFromEnv } from "@/lib/regrid/env";
@@ -80,7 +81,7 @@ function RegridApp() {
   }, []);
 
   const [enabledLayers, setEnabledLayers] = useState<Set<LayerId>>(
-    () => new Set<LayerId>(["hifld-transmission", "usda-wildfire", "epa-ejscreen"]),
+    () => new Set<LayerId>(LAYERS.map((l) => l.id)),
   );
   const [projectKind, setProjectKind] = useState<ProjectKind>("solar");
   const [acreage, setAcreage] = useState(50);
@@ -92,6 +93,7 @@ function RegridApp() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [highlightedConflict, setHighlightedConflict] = useState<LayerId | null>(null);
   const [copilotRunning, setCopilotRunning] = useState(false);
+  const [copilotAnswer, setCopilotAnswer] = useState<string | null>(null);
   const [relocateSuccess, setRelocateSuccess] = useState(false);
   const [compare, setCompare] = useState<{
     beforeScore: number | null;
@@ -125,8 +127,9 @@ function RegridApp() {
   const handleMapClick = (lngLat: [number, number]) => {
     if (copilotRunning) return;
     if (!activeTool) return;
+    setCopilotAnswer(null);
     const id = `shape-${Date.now()}`;
-    const next = buildShape(activeTool, lngLat, radiusMeters, id);
+    const next = buildShape(activeTool, clampLngLatToCalifornia(lngLat), radiusMeters, id);
     setShape(next);
     setGhostShape(null);
     setShapePulse(true);
@@ -135,7 +138,7 @@ function RegridApp() {
     setResult(null);
     setAnalysisState("idle");
     setCompare({ beforeScore: null, afterScore: null, movedKm: null, headline: null });
-    flyToRef.current(lngLat, Math.max(8.4, 8.4));
+    flyToRef.current(clampLngLatToCalifornia(lngLat), Math.max(8.4, 8.4));
   };
 
   const handleToggleLayer = (id: LayerId) => {
@@ -152,6 +155,7 @@ function RegridApp() {
 
   const handleAnalyze = () => {
     if (!shape) return;
+    setCopilotAnswer(null);
     setAnalysisState("analyzing");
     setResult(null);
     setTimeout(() => {
@@ -163,6 +167,7 @@ function RegridApp() {
 
   const handleRelocate = () => {
     if (!shape) return;
+    setCopilotAnswer(null);
     setAnalysisState("relocating");
     setHighlightedConflict(null);
     relocateArmedRef.current = true;
@@ -172,7 +177,14 @@ function RegridApp() {
     setTimeout(() => {
       const beforeCenter = shape.center;
       const beforeConflicts = result?.conflicts ?? null;
-      const { center, result: newResult } = findOptimalRelocation(shape, enabledLayers, layersRef.current);
+      const { center, result: newResult } = findOptimalRelocation(
+        shape,
+        enabledLayers,
+        layersRef.current,
+        {
+          maxOffsetDeg: LOCAL_RELOCATE_MAX_OFFSET_DEG,
+        },
+      );
       flyToRef.current(center, 9.2);
       setTimeout(() => {
         const newShape = buildShape(shape.kind, center, shape.radiusMeters, `shape-${Date.now()}`);
@@ -199,6 +211,7 @@ function RegridApp() {
   };
 
   const handleClear = () => {
+    setCopilotAnswer(null);
     setShape(null);
     setGhostShape(null);
     setShapePulse(false);
@@ -323,12 +336,17 @@ function RegridApp() {
           hasShape={!!shape}
           analysisState={analysisState}
           result={result}
+          copilotAnswer={copilotAnswer}
           onHoverConflict={setHighlightedConflict}
           relocateSuccess={relocateSuccess}
           compare={compare}
           onApplySuggestion={handleRelocate}
           canApplySuggestion={
-            !!shape && analysisState === "result" && !!result && result.score >= 28 && result.conflicts.length > 0
+            !!shape &&
+            analysisState === "result" &&
+            !!result &&
+            result.score >= 28 &&
+            result.conflicts.length > 0
           }
         />
 
@@ -345,10 +363,14 @@ function RegridApp() {
       <SpatialCopilot
         allLayers={layers}
         enabledLayers={enabledLayers}
+        mapboxToken={token}
+        onApplyEnabledLayers={setEnabledLayers}
         shapeKind={activeTool ?? "circle"}
         flyTo={(c, z) => flyToRef.current(c, z)}
         statusLine={copilotStatusLine}
         onCopilotRunningChange={setCopilotRunning}
+        onCopilotAnswer={setCopilotAnswer}
+        showAnswerInRiskPanel={!!copilotAnswer}
         onApplyShape={(next) => {
           setShape(next);
           setHighlightedConflict(null);

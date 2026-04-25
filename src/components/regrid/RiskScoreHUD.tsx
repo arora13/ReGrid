@@ -6,6 +6,8 @@ interface RiskScoreHUDProps {
   hasShape: boolean;
   analysisState: "idle" | "analyzing" | "result" | "relocating";
   result: AnalysisResult | null;
+  /** Latest copilot plain-English reply — shown here so it sits next to the score. */
+  copilotAnswer?: string | null;
   onHoverConflict: (id: LayerId | null) => void;
   relocateSuccess: boolean;
   compare: {
@@ -55,6 +57,7 @@ export function RiskScoreHUD({
   hasShape,
   analysisState,
   result,
+  copilotAnswer = null,
   onHoverConflict,
   relocateSuccess,
   compare,
@@ -125,6 +128,13 @@ export function RiskScoreHUD({
             ) : null}
           </p>
         </div>
+
+        {copilotAnswer ? (
+          <div className="border-b border-sky-400/25 bg-sky-500/10 px-5 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#7dd3fc]">Answer to your prompt</p>
+            <p className="mt-2 text-[13px] font-medium leading-snug text-[#f8fafc]">{copilotAnswer}</p>
+          </div>
+        ) : null}
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {!hasShape && analysisState === "idle" && (

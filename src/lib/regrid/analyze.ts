@@ -1,5 +1,6 @@
 import type { AnalysisResult, BuiltinLayerId, Conflict, DrawnShape, LayerDef, LayerId } from "./types";
 import { LAYERS } from "./layers";
+import { clampLngLatToCalifornia } from "./california";
 import { buildShape, distanceMeters, siteFootprintRing } from "./geo";
 
 // Point-in-polygon (ray casting) on lng/lat; fine for mock analysis.
@@ -263,22 +264,37 @@ export function analyzeShape(
   };
 }
 
-// Genuine grid-search relocator to find lowest conflict score
+export interface FindRelocationOptions {
+  /** Euclidean degree distance from seed; omit for full statewide search (manual Optimize). */
+  maxOffsetDeg?: number;
+}
+
+function offsetDegFrom(a: [number, number], b: [number, number]): number {
+  return Math.hypot(b[0] - a[0], b[1] - a[1]);
+}
+
+// Grid-search relocator for lowest conflict score; optional cap keeps copilot "near X" honest.
 export function findOptimalRelocation(
   shape: DrawnShape,
   enabled: Set<LayerId>,
   allLayers: LayerDef[] = LAYERS,
+  options?: FindRelocationOptions,
 ): { center: [number, number]; result: AnalysisResult } {
-  let best = { center: shape.center, result: analyzeShape(shape, enabled, allLayers) };
-  // Expanding search outward up to larger distances (e.g. ~100km)
+  const origin = clampLngLatToCalifornia(shape.center);
+  const originShape = buildShape(shape.kind, origin, shape.radiusMeters, shape.id);
+  let best = { center: origin, result: analyzeShape(originShape, enabled, allLayers) };
+  const cap = options?.maxOffsetDeg;
+  // Expanding search outward, staying inside California (and inside cap when set).
   const stepsDeg = [0.05, 0.1, 0.2, 0.4, 0.6, 0.9, 1.2, 1.5];
   for (const r of stepsDeg) {
     for (let a = 0; a < 360; a += 30) {
       const rad = (a * Math.PI) / 180;
-      const candidateCenter: [number, number] = [
-        shape.center[0] + Math.cos(rad) * r,
-        shape.center[1] + Math.sin(rad) * r * 0.85,
+      const raw: [number, number] = [
+        origin[0] + Math.cos(rad) * r,
+        origin[1] + Math.sin(rad) * r * 0.85,
       ];
+      const candidateCenter = clampLngLatToCalifornia(raw);
+      if (cap !== undefined && offsetDegFrom(origin, candidateCenter) > cap + 1e-9) continue;
       const candidate = buildShape(shape.kind, candidateCenter, shape.radiusMeters, `${shape.id}-reloc-${r}-${a}`);
       const res = analyzeShape(candidate, enabled, allLayers);
       if (res.score < best.result.score) {
@@ -287,5 +303,5 @@ export function findOptimalRelocation(
       }
     }
   }
-  return best;
+  return { center: clampLngLatToCalifornia(best.center), result: best.result };
 }

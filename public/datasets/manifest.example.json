@@ -5,7 +5,8 @@
       "name": "PADUS protected areas (CA excerpt)",
       "agency": "USGS PADUS",
       "color": "#4ade80",
-      "geojsonUrl": "/datasets/padus-ca-excerpt.geojson"
+      "geojsonUrl": "/datasets/padus-ca-excerpt.geojson",
+      "hoverHelp": "Checked: draws this GeoJSON on the map and includes it in the siting score. Unchecked: hides it and removes it from scoring."
     },
     {
       "id": "ext:second-dataset",

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { GeoJSONSource, Map as MapboxMap } from "mapbox-gl";
 import type { DrawnShape, LayerDef, LayerId } from "@/lib/regrid/types";
 import { INITIAL_VIEW } from "@/lib/regrid/layers";
+import { CALIFORNIA_MAX_BOUNDS } from "@/lib/regrid/california";
 import { buildShape } from "@/lib/regrid/geo";
 
 /** Mapbox GL layer/source ids must be alphanumeric, dash, or underscore */
@@ -121,6 +122,7 @@ export function MapCanvas({
           style: "mapbox://styles/mapbox/dark-v11",
           center: INITIAL_VIEW.center,
           zoom: INITIAL_VIEW.zoom,
+          maxBounds: CALIFORNIA_MAX_BOUNDS,
           pitch: 35,
           bearing: -8,
           attributionControl: false,

@@ -40,4 +40,6 @@ export interface LayerDef {
   agency: string;
   color: string; // hex
   geojson: GeoJSON.FeatureCollection;
+  /** Native tooltip: what the map shows when on vs what turns off when unchecked. */
+  hoverHelp?: string;
 }

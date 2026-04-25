@@ -1,7 +1,7 @@
 import type { LayerDef } from "./types";
 import powerPlantsRaw from "@/data/power-plants.geojson?raw";
 
-// Mock federal datasets — distributed across U.S. regions for a national demo.
+// Mock federal-style datasets — all synthetic geometry is placed in California only.
 // Pure simulated GeoJSON.
 const NCAL: [number, number] = [-121.5, 39.0]; // NorCal
 const CCAL: [number, number] = [-119.4, 36.8]; // Central
@@ -63,6 +63,8 @@ export const LAYERS: LayerDef[] = [
     name: "HIFLD Electric Transmission Lines",
     agency: "DHS · HIFLD",
     color: "#38bdf8",
+    hoverHelp:
+      "Checked: cyan transmission-style corridors on the map (demo geometry, not live HIFLD). The siting score uses overlap and distance to these lines. Unchecked: corridors disappear and are ignored in the score.",
     geojson: {
       type: "FeatureCollection",
       features: [
@@ -89,6 +91,8 @@ export const LAYERS: LayerDef[] = [
     name: "EIA Grid Infrastructure",
     agency: "U.S. Energy Information Admin.",
     color: "#60a5fa",
+    hoverHelp:
+      "Checked: blue substation / switchyard / node polygons (demo). Score includes overlap and proximity. Unchecked: hides those shapes and drops them from analysis.",
     geojson: {
       type: "FeatureCollection",
       features: [
@@ -105,6 +109,8 @@ export const LAYERS: LayerDef[] = [
     name: "USDA Wildfire Risk Zones",
     agency: "USDA Forest Service",
     color: "#fb923c",
+    hoverHelp:
+      "Checked: orange wildfire-risk-style zones (demo). Score rises when your site overlaps or sits near them. Unchecked: hides zones and wildfire stops affecting the score.",
     geojson: {
       type: "FeatureCollection",
       features: [
@@ -132,6 +138,8 @@ export const LAYERS: LayerDef[] = [
     name: "EPA EJScreen Disadvantaged Communities",
     agency: "EPA EJScreen",
     color: "#c4b5fd",
+    hoverHelp:
+      "Checked: purple disadvantaged-community style areas (demo EJSCREEN-style). Score reflects overlap and buffers. Unchecked: hides purple areas and removes equity layer from scoring.",
     geojson: {
       type: "FeatureCollection",
       features: [
@@ -158,6 +166,8 @@ export const LAYERS: LayerDef[] = [
     name: "Power Plant Facilities",
     agency: "Discord dataset upload",
     color: "#22d3ee",
+    hoverHelp:
+      "Checked: cyan dots for in-state power plants (sample CA generator list). Score can flag proximity to plants. Unchecked: hides plant dots and they are not used in the score.",
     geojson: POWER_PLANTS,
   },
 ];
