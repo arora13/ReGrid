@@ -38,6 +38,12 @@ export function TokenGate({ onSubmit }: TokenGateProps) {
           </a>
           .
         </p>
+        <p className="mb-5 text-xs text-muted-foreground">
+          Tip: for local dev you can also set{" "}
+          <code className="font-mono text-primary">VITE_MAPBOX_TOKEN</code> in{" "}
+          <code className="font-mono text-primary">.env.local</code> and reload — this screen will
+          disappear automatically.
+        </p>
 
         <form
           onSubmit={(e) => {
@@ -62,7 +68,7 @@ export function TokenGate({ onSubmit }: TokenGateProps) {
         </form>
 
         <p className="mt-4 font-mono text-[10px] tracking-wider text-muted-foreground/70 uppercase">
-          Token stored locally in your browser only.
+          If entered here, token is stored in browser localStorage only.
         </p>
       </div>
     </div>

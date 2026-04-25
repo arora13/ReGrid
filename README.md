@@ -79,16 +79,16 @@ Target production engine (FastAPI + Shapely):
 To move from demo simulation to production-grade spatial intelligence, these APIs/services are needed:
 
 ### 1) Map and Geocoding
-- **Mapbox Access Token** (`NEXT_PUBLIC_MAPBOX_TOKEN`)
+- **Mapbox Access Token** (`VITE_MAPBOX_TOKEN`)
 - Optional: Mapbox Geocoding API (search, reverse geocode, place labels)
 
 ### 2) Auth and User Data
-- **Convex Deployment URL** (`NEXT_PUBLIC_CONVEX_URL`)
+- **Convex Deployment URL** (`VITE_CONVEX_URL`)
 - Convex auth provider configuration (email/password or OAuth)
 - Convex tables/functions for saved projects, analysis history, and user settings
 
 ### 3) Spatial Analysis Service
-- **FastAPI service URL** (example: `NEXT_PUBLIC_SPATIAL_API_URL`)
+- **FastAPI service URL** (example: `VITE_SPATIAL_API_URL`)
 - Endpoints:
   - `GET /health` - service and dataset readiness
   - `GET /api/layers` - GeoJSON layers for rendering
@@ -112,13 +112,13 @@ To move from demo simulation to production-grade spatial intelligence, these API
 
 ```bash
 # Required now
-NEXT_PUBLIC_MAPBOX_TOKEN=...
+VITE_MAPBOX_TOKEN=...
 
 # Required when Convex is connected
-NEXT_PUBLIC_CONVEX_URL=...
+VITE_CONVEX_URL=...
 
 # Recommended when external spatial API is enabled
-NEXT_PUBLIC_SPATIAL_API_URL=http://localhost:8000
+VITE_SPATIAL_API_URL=http://localhost:8000
 ```
 
 ## Local Development

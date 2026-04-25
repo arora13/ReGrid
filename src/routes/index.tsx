@@ -9,6 +9,7 @@ import { TokenGate } from "@/components/regrid/TokenGate";
 import { LAYERS } from "@/lib/regrid/layers";
 import { buildShape } from "@/lib/regrid/geo";
 import { analyzeShape, findOptimalRelocation } from "@/lib/regrid/analyze";
+import { getPublicMapboxTokenFromEnv } from "@/lib/regrid/env";
 import type {
   AnalysisResult,
   DrawnShape,
@@ -42,6 +43,11 @@ type AnalysisState = "idle" | "analyzing" | "result" | "relocating";
 function RegridApp() {
   const [token, setToken] = useState<string | null>(null);
   useEffect(() => {
+    const fromEnv = getPublicMapboxTokenFromEnv();
+    if (fromEnv) {
+      setToken(fromEnv);
+      return;
+    }
     const saved = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
     if (saved) setToken(saved);
   }, []);
