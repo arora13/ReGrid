@@ -83,10 +83,10 @@ export function RiskScoreHUD({
       initial={{ y: -10, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.35, ease: "easeOut", delay: 0.05 }}
-      className="pointer-events-auto absolute top-8 right-8 z-20 w-[min(340px,calc(100vw-2rem))]"
+      className="pointer-events-auto absolute top-4 right-4 z-20 w-[min(320px,calc(100vw-2rem))] sm:top-6 sm:right-6"
     >
       <div
-        className={`glass flex max-h-[calc(100vh-7.25rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] p-4 shadow-sm transition ${
+        className={`glass flex max-h-[calc(100svh-8rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] p-3 shadow-sm transition ${
           dormant ? "opacity-70" : "opacity-100"
         }`}
       >
@@ -106,7 +106,7 @@ export function RiskScoreHUD({
           </div>
         </div>
 
-        <div className="mt-4 flex shrink-0 items-center gap-4">
+        <div className="mt-3 flex shrink-0 items-center gap-3">
           <div className="relative h-16 w-16 shrink-0">
             <svg viewBox="0 0 64 64" className="h-16 w-16 -rotate-90">
               <circle cx="32" cy="32" r="26" fill="none" stroke="oklch(1 0 0 / 0.08)" strokeWidth="6" />
