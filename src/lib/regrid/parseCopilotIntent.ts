@@ -21,6 +21,15 @@ function anthropicModel(): string {
   return m || DEFAULT_MODEL;
 }
 
+/** Keeps each copilot intent call small (billing). Override with ANTHROPIC_MAX_OUTPUT_TOKENS=256–1024. */
+function anthropicMaxOutputTokens(): number {
+  const raw =
+    typeof process !== "undefined" ? process.env.ANTHROPIC_MAX_OUTPUT_TOKENS?.trim() : undefined;
+  const n = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  if (!Number.isFinite(n)) return 512;
+  return Math.min(1024, Math.max(256, n));
+}
+
 function extractAssistantText(body: unknown): string {
   const b = body as {
     content?: Array<{ type?: string; text?: string }>;
@@ -91,7 +100,7 @@ export const parseCopilotIntentFn = createServerFn({ method: "POST" })
         },
         body: JSON.stringify({
           model: anthropicModel(),
-          max_tokens: 2048,
+          max_tokens: anthropicMaxOutputTokens(),
           temperature: 0.2,
           system: SYSTEM_PROMPT,
           messages: [
