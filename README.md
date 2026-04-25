@@ -11,7 +11,7 @@ The product experience is a full-screen dark map interface with glassmorphism co
 ## Demo Flow
 
 1. **Explore** - Navigate a full-screen dark map and toggle infrastructure and risk layers.
-2. **Propose** - Choose a shape tool, click the map, and place a project footprint.
+2. **Propose** - Use the top-left project panel to choose a footprint tool, then click the map.
 3. **Analyze** - Run conflict scoring to compute a 0-100 siting risk score.
 4. **Optimize** - Trigger AI Auto-Relocate to search nearby alternatives and animate to a better site.
 5. **Copilot** - Type a mission in the bottom command bar, watch the streamed trace, and let the agent finish with a fly-to reveal.
@@ -135,7 +135,7 @@ npm run dev
 ```
 
 Open the app. If `VITE_MAPBOX_TOKEN` is set in `.env.local`, the map loads immediately; otherwise paste a token in the gate, then:
-- Toggle layers in the left panel
+- Toggle layers in the bottom-left dock
 - Place a shape on map click
 - Analyze risk
 - Auto-relocate for optimized siting

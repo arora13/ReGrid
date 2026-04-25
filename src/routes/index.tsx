@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MapCanvas } from "@/components/regrid/MapCanvas";
-import { LayerStack } from "@/components/regrid/LayerStack";
-import { ToolPalette } from "@/components/regrid/ToolPalette";
-import { RiskPanel } from "@/components/regrid/RiskPanel";
-import { TopBar } from "@/components/regrid/TopBar";
 import { TokenGate } from "@/components/regrid/TokenGate";
 import { SpatialCopilot } from "@/components/regrid/SpatialCopilot";
+import { ProjectControlPanel } from "@/components/regrid/ProjectControlPanel";
+import { LayersDock } from "@/components/regrid/LayersDock";
+import { RiskScoreHUD } from "@/components/regrid/RiskScoreHUD";
 import { LAYERS } from "@/lib/regrid/layers";
 import { buildShape } from "@/lib/regrid/geo";
 import { analyzeShape, findOptimalRelocation } from "@/lib/regrid/analyze";
@@ -58,11 +57,13 @@ function RegridApp() {
   );
   const [activeTool, setActiveTool] = useState<ShapeKind | null>("circle");
   const [shape, setShape] = useState<DrawnShape | null>(null);
-  const [allShapesPlaced, setAllShapesPlaced] = useState(0);
   const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [highlightedConflict, setHighlightedConflict] = useState<LayerId | null>(null);
   const [copilotRunning, setCopilotRunning] = useState(false);
+  const [relocateSuccess, setRelocateSuccess] = useState(false);
+  const prevScoreRef = useRef<number | null>(null);
+  const relocateArmedRef = useRef(false);
 
   const flyToRef = useRef<(c: [number, number], z?: number) => void>(() => {});
 
@@ -77,7 +78,6 @@ function RegridApp() {
     setShape(next);
     setResult(null);
     setAnalysisState("idle");
-    setAllShapesPlaced((n) => n + 1);
     flyToRef.current(lngLat, Math.max(8.4, 8.4));
   };
 
@@ -108,6 +108,9 @@ function RegridApp() {
     if (!shape) return;
     setAnalysisState("relocating");
     setHighlightedConflict(null);
+    relocateArmedRef.current = true;
+    prevScoreRef.current = result?.score ?? null;
+    setRelocateSuccess(false);
     setTimeout(() => {
       const { center, result: newResult } = findOptimalRelocation(shape, enabledLayers);
       flyToRef.current(center, 9.2);
@@ -125,9 +128,27 @@ function RegridApp() {
     setResult(null);
     setAnalysisState("idle");
     setHighlightedConflict(null);
+    setRelocateSuccess(false);
+    relocateArmedRef.current = false;
+    prevScoreRef.current = null;
   };
 
   const layers = useMemo(() => LAYERS, []);
+
+  useEffect(() => {
+    if (!relocateArmedRef.current) return;
+    if (analysisState !== "result" || !result) return;
+    const before = prevScoreRef.current;
+    const after = result.score;
+    if (before !== null && after < before) {
+      setRelocateSuccess(true);
+      const t = window.setTimeout(() => setRelocateSuccess(false), 3800);
+      relocateArmedRef.current = false;
+      return () => window.clearTimeout(t);
+    }
+    relocateArmedRef.current = false;
+    return;
+  }, [analysisState, result]);
 
   if (!token) {
     return (
@@ -148,6 +169,7 @@ function RegridApp() {
         enabledLayers={enabledLayers}
         shape={shape}
         highlightedConflict={highlightedConflict}
+        crosshair={!!activeTool && !copilotRunning}
         onMapClick={handleMapClick}
         onMapReady={(fly) => {
           flyToRef.current = fly;
@@ -163,28 +185,25 @@ function RegridApp() {
         }}
       />
 
-      <TopBar
-        shapeCount={allShapesPlaced}
-        hasResult={analysisState === "result"}
-        riskScore={result?.score ?? null}
-      />
-
-      <LayerStack layers={layers} enabled={enabledLayers} onToggle={handleToggleLayer} />
-
-      <RiskPanel
-        state={analysisState}
-        result={result}
+      <ProjectControlPanel
+        activeTool={activeTool}
+        onSelectTool={setActiveTool}
+        hasShape={!!shape}
         onAnalyze={handleAnalyze}
-        onRelocate={handleRelocate}
-        onHoverConflict={setHighlightedConflict}
-        hasShape={!!shape}
+        onFindBetterSite={handleRelocate}
+        onClear={handleClear}
+        analysisState={analysisState}
+        copilotRunning={copilotRunning}
       />
 
-      <ToolPalette
-        active={activeTool}
-        onSelect={setActiveTool}
-        onClear={handleClear}
+      <LayersDock layers={layers} enabled={enabledLayers} onToggle={handleToggleLayer} />
+
+      <RiskScoreHUD
         hasShape={!!shape}
+        analysisState={analysisState}
+        result={result}
+        onHoverConflict={setHighlightedConflict}
+        relocateSuccess={relocateSuccess}
       />
 
       <SpatialCopilot

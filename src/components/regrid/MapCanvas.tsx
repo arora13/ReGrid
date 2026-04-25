@@ -9,6 +9,7 @@ interface MapCanvasProps {
   enabledLayers: Set<LayerId>;
   shape: DrawnShape | null;
   highlightedConflict: LayerId | null;
+  crosshair?: boolean;
   onMapClick: (lngLat: [number, number]) => void;
   onMapReady: (fly: (center: [number, number], zoom?: number) => void) => void;
 }
@@ -19,6 +20,7 @@ export function MapCanvas({
   enabledLayers,
   shape,
   highlightedConflict,
+  crosshair = true,
   onMapClick,
   onMapReady,
 }: MapCanvasProps) {
@@ -160,7 +162,7 @@ export function MapCanvas({
     <div
       ref={containerRef}
       className="absolute inset-0 h-full w-full"
-      style={{ cursor: "crosshair" }}
+      style={{ cursor: crosshair ? "crosshair" : "grab" }}
     />
   );
 }

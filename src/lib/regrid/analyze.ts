@@ -100,16 +100,19 @@ export function analyzeShape(
     }
   }
 
+  const rank = (s: Conflict["severity"]) => (s === "high" ? 3 : s === "medium" ? 2 : 1);
+
   // De-dupe by label, keeping highest severity
   const dedup = new Map<string, Conflict>();
   for (const c of conflicts) {
     const prev = dedup.get(c.label);
     if (!prev) dedup.set(c.label, c);
+    else if (rank(c.severity) > rank(prev.severity)) dedup.set(c.label, c);
   }
 
   return {
     score: Math.min(100, Math.round(score)),
-    conflicts: Array.from(dedup.values()).slice(0, 6),
+    conflicts: Array.from(dedup.values()).slice(0, 5),
   };
 }
 
