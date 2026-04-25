@@ -44,38 +44,41 @@ export function ToolPalette({ active, onSelect, onClear, hasShape }: ToolPalette
       initial={{ y: 40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
-      className="pointer-events-auto absolute bottom-52 left-1/2 z-20 -translate-x-1/2"
+      className="pointer-events-auto absolute bottom-64 left-1/2 z-20 -translate-x-1/2"
     >
-      <div className="glass-strong flex items-center gap-2 rounded-2xl p-2">
-        <div className="px-3 py-2">
-          <p className="font-mono text-[10px] tracking-[0.25em] text-primary uppercase">02 · Project</p>
-          <p className="text-[11px] text-muted-foreground">Drop footprint</p>
+      <div className="glass-strong flex items-center gap-1.5 rounded-2xl p-1.5">
+        <div className="hidden items-center gap-2 px-2 sm:flex">
+          <p className="font-mono text-[10px] tracking-[0.2em] text-primary/80 uppercase">Footprint</p>
         </div>
-        <div className="h-10 w-px bg-white/10" />
+        <div className="hidden h-10 w-px bg-white/10 sm:block" />
 
         {TOOLS.map((t) => {
           const isActive = active === t.kind;
           return (
             <button
               key={t.kind}
+              type="button"
+              title={t.label}
+              aria-label={t.label}
               onClick={() => onSelect(t.kind)}
-              className={`group flex h-14 w-16 flex-col items-center justify-center rounded-xl border transition-all ${
+              className={`group flex h-12 w-12 flex-col items-center justify-center rounded-xl border transition-all ${
                 isActive
                   ? "border-primary/60 bg-primary/15 text-primary glow-emerald"
                   : "border-white/[0.06] text-muted-foreground hover:border-white/15 hover:text-foreground"
               }`}
             >
               {t.icon}
-              <span className="mt-1 text-[10px] font-medium tracking-wide">{t.label}</span>
             </button>
           );
         })}
 
         <div className="h-10 w-px bg-white/10" />
         <button
+          type="button"
+          title="Clear footprint"
           onClick={onClear}
           disabled={!hasShape}
-          className="h-14 rounded-xl border border-white/[0.06] px-4 text-xs font-medium text-muted-foreground transition-all hover:border-destructive/40 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-white/[0.06] disabled:hover:text-muted-foreground"
+          className="h-12 rounded-xl border border-white/[0.06] px-3 text-xs font-medium text-muted-foreground transition-all hover:border-destructive/40 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-white/[0.06] disabled:hover:text-muted-foreground"
         >
           Clear
         </button>
@@ -84,9 +87,9 @@ export function ToolPalette({ active, onSelect, onClear, hasShape }: ToolPalette
         <motion.p
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-3 text-center font-mono text-[11px] tracking-wider text-primary/90 uppercase animate-flicker"
+          className="mt-2 text-center font-mono text-[10px] tracking-wider text-primary/80 uppercase"
         >
-          ▸ Click anywhere on the map to place {active}
+          Click map to place {active}
         </motion.p>
       )}
     </motion.div>

@@ -24,16 +24,11 @@ export function RiskPanel({
       initial={{ x: 40, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="glass-strong pointer-events-auto absolute top-24 right-6 bottom-56 z-20 flex w-[380px] flex-col rounded-2xl"
+      className="glass-strong pointer-events-auto absolute top-28 right-8 bottom-72 z-20 flex w-[340px] flex-col rounded-2xl"
     >
-      <div className="border-b border-white/[0.06] p-5">
-        <p className="font-mono text-[10px] tracking-[0.25em] text-primary/80 uppercase">
-          03 · Conflict Engine
-        </p>
-        <h2 className="mt-1 text-lg font-semibold tracking-tight">Risk Analysis</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Spatial overlap & buffer check across active federal layers.
-        </p>
+      <div className="border-b border-white/[0.06] px-4 py-3">
+        <p className="font-mono text-[10px] tracking-[0.25em] text-primary/80 uppercase">Analysis</p>
+        <h2 className="mt-0.5 text-base font-semibold tracking-tight">Conflict risk</h2>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -63,24 +58,22 @@ function IdleView({ hasShape, onAnalyze }: { hasShape: boolean; onAnalyze: () =>
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="flex h-full flex-col items-center justify-center p-8 text-center"
+      className="flex h-full flex-col items-center justify-center p-7 text-center"
     >
-      <div className="relative mb-6 h-32 w-32 rounded-full border border-primary/20">
-        <div className="absolute inset-2 rounded-full border border-primary/30 animate-spin-slow" />
-        <div className="absolute inset-6 rounded-full border border-dashed border-primary/40" />
-        <div className="absolute inset-0 flex items-center justify-center font-mono text-[11px] tracking-widest text-primary/80 uppercase">
+      <div className="relative mb-5 h-24 w-24 rounded-full border border-primary/20">
+        <div className="absolute inset-2 rounded-full border border-primary/25 animate-spin-slow" />
+        <div className="absolute inset-5 rounded-full border border-dashed border-primary/35" />
+        <div className="absolute inset-0 flex items-center justify-center font-mono text-[10px] tracking-widest text-primary/80 uppercase">
           {hasShape ? "Ready" : "Awaiting"}
         </div>
       </div>
-      <p className="text-sm text-muted-foreground">
-        {hasShape
-          ? "Footprint placed. Run conflict analysis to evaluate spatial risk."
-          : "Drop a project footprint on the map to begin."}
+      <p className="max-w-[240px] text-sm leading-relaxed text-muted-foreground">
+        {hasShape ? "Analyze this footprint against the active layers." : "Place a footprint on the map to begin."}
       </p>
       <button
         onClick={onAnalyze}
         disabled={!hasShape}
-        className="mt-6 inline-flex items-center gap-2 rounded-xl border border-primary/50 bg-primary/15 px-6 py-3 text-sm font-semibold text-primary transition-all hover:bg-primary/25 disabled:cursor-not-allowed disabled:opacity-40 enabled:glow-emerald"
+        className="mt-5 inline-flex items-center gap-2 rounded-xl border border-primary/45 bg-primary/12 px-5 py-2.5 text-sm font-semibold text-primary transition-all hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40 enabled:glow-emerald"
       >
         <span className="h-2 w-2 rounded-full bg-primary" />
         Analyze Site

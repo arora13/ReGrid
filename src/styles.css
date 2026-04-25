@@ -111,10 +111,11 @@
   --sidebar-ring: oklch(0.78 0.22 152 / 0.55);
 
   /* Glass + glow tokens */
-  --glass-bg: oklch(0.18 0.025 240 / 0.55);
-  --glass-bg-strong: oklch(0.16 0.025 240 / 0.78);
-  --glass-border: oklch(0.78 0.22 152 / 0.22);
-  --glass-border-strong: oklch(0.78 0.22 152 / 0.5);
+  /* Glass: keep readable contrast but let more map show through */
+  --glass-bg: oklch(0.18 0.025 240 / 0.42);
+  --glass-bg-strong: oklch(0.16 0.025 240 / 0.58);
+  --glass-border: oklch(0.78 0.22 152 / 0.16);
+  --glass-border-strong: oklch(0.78 0.22 152 / 0.28);
   --glow-emerald: 0 0 24px oklch(0.78 0.22 152 / 0.45), 0 0 60px oklch(0.78 0.22 152 / 0.18);
   --glow-amber: 0 0 24px oklch(0.78 0.18 70 / 0.5);
   --glow-red: 0 0 24px oklch(0.68 0.24 27 / 0.55);
@@ -203,8 +204,8 @@
   }
   .glass-strong {
     background: var(--glass-bg-strong);
-    backdrop-filter: blur(28px) saturate(180%);
-    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
     border: 1px solid var(--glass-border-strong);
     box-shadow: var(--shadow-glass);
   }

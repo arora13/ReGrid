@@ -159,7 +159,7 @@ function RegridApp() {
         className="pointer-events-none absolute inset-0 z-10"
         style={{
           background:
-            "radial-gradient(ellipse at center, transparent 50%, oklch(0.1 0.02 240 / 0.55) 100%)",
+            "radial-gradient(ellipse at center, transparent 62%, oklch(0.1 0.02 240 / 0.34) 100%)",
         }}
       />
 
