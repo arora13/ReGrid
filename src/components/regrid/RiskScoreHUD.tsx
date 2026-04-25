@@ -14,35 +14,41 @@ interface RiskScoreHUDProps {
     movedKm: number | null;
     headline: string | null;
   };
+  onApplySuggestion?: () => void;
+  canApplySuggestion?: boolean;
 }
 
-function riskTone(score: number | null): "empty" | "good" | "caution" | "bad" {
-  if (score === null) return "empty";
-  if (score >= 60) return "bad";
-  if (score >= 30) return "caution";
-  return "good";
+/** Rough score contribution for display (+N) — aligned with analyze.ts weighting. */
+function approxConflictWeight(c: Conflict): number {
+  const isOverlap = c.detail.includes("overlap");
+  if (isOverlap) {
+    if (c.layerId === "usda-wildfire") return 32;
+    if (c.layerId === "epa-ejscreen") return 28;
+    if (c.layerId === "power-plants") return 14;
+    if (typeof c.layerId === "string" && c.layerId.startsWith("ext:")) return 24;
+    return 18;
+  }
+  if (c.layerId === "hifld-transmission") return 6;
+  if (c.layerId === "power-plants") return 8;
+  if (typeof c.layerId === "string" && c.layerId.startsWith("ext:")) return 9;
+  return 10;
 }
 
-function layerAccent(layerId: LayerId): string {
-  if (layerId === "hifld-transmission" || layerId === "eia-grid") return "#38bdf8"; // cyan/blue
-  if (layerId === "epa-ejscreen") return "#c4b5fd"; // purple
-  if (layerId === "usda-wildfire") return "#fb923c"; // orange
-  if (layerId === "power-plants") return "#22d3ee"; // data upload
-  if (typeof layerId === "string" && layerId.startsWith("ext:")) return "#84cc16"; // lime — external datasets
-  return "#94a3b8";
+function headlineTier(score: number | null): { title: string; accent: "orange" | "amber" | "emerald" | "slate" } {
+  if (score === null) return { title: "Awaiting score", accent: "slate" };
+  if (score >= 60) return { title: "High", accent: "orange" };
+  if (score >= 40) return { title: "Medium-high", accent: "orange" };
+  if (score >= 30) return { title: "Moderate", accent: "amber" };
+  return { title: "Low", accent: "emerald" };
 }
 
-function severityAccent(sev: Conflict["severity"]): string {
-  if (sev === "high") return "#f87171";
-  if (sev === "medium") return "#fbbf24";
-  return "#94a3b8";
-}
-
-function riskLabel(score: number | null): string {
-  if (score === null) return "—";
-  if (score >= 60) return "High";
-  if (score >= 30) return "Moderate";
-  return "Low";
+function conflictAccent(layerId: LayerId): { line: string; title: string } {
+  if (layerId === "usda-wildfire") return { line: "#fb923c", title: "#fdba74" };
+  if (layerId === "epa-ejscreen") return { line: "#f472b6", title: "#fbcfe8" };
+  if (layerId === "hifld-transmission" || layerId === "eia-grid") return { line: "#38bdf8", title: "#7dd3fc" };
+  if (layerId === "power-plants") return { line: "#22d3ee", title: "#a5f3fc" };
+  if (typeof layerId === "string" && layerId.startsWith("ext:")) return { line: "#84cc16", title: "#bef264" };
+  return { line: "#94a3b8", title: "#e2e8f0" };
 }
 
 export function RiskScoreHUD({
@@ -52,216 +58,168 @@ export function RiskScoreHUD({
   onHoverConflict,
   relocateSuccess,
   compare,
+  onApplySuggestion,
+  canApplySuggestion = false,
 }: RiskScoreHUDProps) {
   const score = result?.score ?? null;
-  const tone = riskTone(score);
-  const conflicts = useMemo(() => result?.conflicts?.slice(0, 3) ?? [], [result]);
+  const tier = headlineTier(score);
+  const conflicts = useMemo(() => result?.conflicts?.slice(0, 5) ?? [], [result]);
+  const activeCount = conflicts.length;
 
-  const ringColor =
-    tone === "bad" ? "#f87171" : tone === "caution" ? "#fbbf24" : tone === "good" ? "#34d399" : "oklch(1 0 0 / 0.10)";
+  const scoreColor =
+    tier.accent === "orange" || tier.accent === "amber"
+      ? "text-[#e28a5b]"
+      : tier.accent === "emerald"
+        ? "text-emerald-400/95"
+        : "text-[#64748b]";
 
-  const pct = score === null ? 0 : Math.max(0, Math.min(100, score));
-  const dormant = !hasShape && analysisState === "idle" && !result;
-
-  const nextAction =
-    !hasShape && analysisState === "idle"
-      ? "Place a footprint to begin analysis."
-      : hasShape && analysisState === "idle" && !result
-        ? "Run Analyze site to generate a risk score."
-        : analysisState === "analyzing"
-          ? "Computing intersections and buffers…"
-          : analysisState === "relocating"
-            ? "Searching nearby candidates while preserving constraints…"
-            : analysisState === "result" && result
-              ? tone === "bad"
-                ? "Try Find better site or run Copilot with a tighter risk ceiling."
-                : tone === "caution"
-                  ? "Review the top drivers, then optimize if you need more margin."
-                  : "Strong candidate — document assumptions and proceed to diligence."
-              : "—";
+  const recommendation = useMemo(() => {
+    if (relocateSuccess && compare.afterScore !== null && compare.beforeScore !== null) {
+      return `Risk improved from ${compare.beforeScore} to ${compare.afterScore}${
+        compare.movedKm != null ? ` after moving the footprint ${compare.movedKm.toFixed(1)} km.` : "."
+      }`;
+    }
+    if (compare.afterScore !== null && compare.beforeScore !== null && compare.movedKm !== null) {
+      return `Previous run: score ${compare.beforeScore} → ${compare.afterScore} · ${compare.movedKm.toFixed(1)} km shift.`;
+    }
+    if (analysisState === "result" && result && score !== null && score >= 30) {
+      return "Try Optimize to search nearby lower-risk anchors while keeping your site size, or tighten layers in the command bar.";
+    }
+    if (analysisState === "result" && result && score !== null && score < 30) {
+      return "Candidate looks comparatively clean on active layers — validate with real datasets before commitment.";
+    }
+    return null;
+  }, [
+    relocateSuccess,
+    compare.afterScore,
+    compare.beforeScore,
+    compare.movedKm,
+    analysisState,
+    result,
+    score,
+  ]);
 
   return (
     <motion.aside
-      initial={{ y: -10, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.35, ease: "easeOut", delay: 0.05 }}
-      className="pointer-events-auto absolute right-4 top-4 z-20 w-[min(280px,calc(100vw-2rem))] sm:right-8 sm:top-8 lg:w-[280px]"
+      initial={{ x: 16, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="pointer-events-auto absolute right-3 top-3 z-20 w-[min(340px,calc(100vw-1.25rem))] sm:right-5 sm:w-[312px]"
     >
-      <div
-        className={`glass flex max-h-[calc(100vh-220px)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] p-4 shadow-sm transition ${
-          dormant ? "opacity-70" : "opacity-100"
-        }`}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-medium text-foreground/90">Risk intelligence</p>
-            <p className="text-[11px] text-muted-foreground">Lower is better</p>
+      <div className="regrid-risk-panel-glow flex max-h-[calc(100vh-7.5rem)] flex-col overflow-hidden rounded-lg border border-white/[0.06] bg-[#0d1117]/95 backdrop-blur-xl">
+        <div className="border-b border-white/[0.06] px-5 py-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#64748b]">Siting risk score</p>
+          <div className="mt-0.5 flex items-baseline gap-1.5">
+            <span className={`text-[2.75rem] font-semibold leading-[1.05] tracking-tight tabular-nums ${scoreColor}`}>
+              {score === null ? "—" : score}
+            </span>
+            <span className="pb-1 text-xl font-medium text-[#475569]">/100</span>
           </div>
-          <div className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-            {analysisState === "analyzing"
-              ? "Running"
-              : analysisState === "relocating"
-                ? "Optimizing"
-                : result
-                  ? "Updated"
-                  : "—"}
-          </div>
+          <p className="mt-2 text-[14px] font-medium leading-snug text-[#e2e8f0]">
+            {tier.title}
+            {analysisState === "result" && result ? (
+              <span className="font-normal text-[#94a3b8]">
+                {" "}
+                · {activeCount} active conflict{activeCount === 1 ? "" : "s"}
+              </span>
+            ) : null}
+          </p>
         </div>
 
-        <div className="mt-4 flex shrink-0 items-center gap-3.5">
-          <div className="relative h-16 w-16 shrink-0">
-            <svg viewBox="0 0 64 64" className="h-16 w-16 -rotate-90">
-              <circle cx="32" cy="32" r="26" fill="none" stroke="oklch(1 0 0 / 0.08)" strokeWidth="6" />
-              <circle
-                cx="32"
-                cy="32"
-                r="26"
-                fill="none"
-                stroke={ringColor}
-                strokeWidth="6"
-                strokeLinecap="round"
-                strokeDasharray={`${(pct / 100) * (2 * Math.PI * 26)} ${2 * Math.PI * 26}`}
-                className="transition-[stroke,stroke-dasharray] duration-500"
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className="text-lg font-semibold tabular-nums leading-none">
-                {score === null ? "—" : score}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {!hasShape && analysisState === "idle" && (
+            <p className="text-[13px] leading-relaxed text-[#94a3b8]">
+              Draw a site on the map, then run analysis to see drivers and score.
+            </p>
+          )}
+          {hasShape && analysisState === "idle" && !result && (
+            <p className="text-[13px] leading-relaxed text-[#94a3b8]">Run analysis to score this footprint.</p>
+          )}
+          {analysisState === "analyzing" && (
+            <div className="space-y-2">
+              <p className="text-[13px] font-medium text-[#e2e8f0]">Evaluating protected land overlap…</p>
+              <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
+                <motion.div
+                  className="h-full bg-[#60a5fa]"
+                  initial={{ x: "-45%" }}
+                  animate={{ x: "130%" }}
+                  transition={{ duration: 1.05, repeat: Infinity, ease: "linear" }}
+                />
               </div>
-              <div className="text-[9px] text-muted-foreground">/100</div>
+              <p className="text-[12px] text-[#64748b]">Transmission · wildfire · equity · grid</p>
             </div>
-          </div>
+          )}
+          {analysisState === "relocating" && (
+            <div className="space-y-2">
+              <p className="text-[13px] font-medium text-[#e2e8f0]">Searching lower-risk anchors…</p>
+              <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
+                <motion.div
+                  className="h-full bg-[#60a5fa]/85"
+                  initial={{ x: "-40%" }}
+                  animate={{ x: "130%" }}
+                  transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
+                />
+              </div>
+            </div>
+          )}
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline justify-between gap-3">
-              <p className="text-sm font-semibold text-foreground/95">{riskLabel(score)} risk</p>
-              <p className="text-[10px] text-muted-foreground tabular-nums">{score === null ? "" : `score ${score}`}</p>
-            </div>
-            {!hasShape && (
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                Place a project footprint to begin analysis.
-              </p>
-            )}
-            {hasShape && analysisState === "idle" && !result && (
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                Ready to score this footprint against active layers.
-              </p>
-            )}
-            {analysisState === "analyzing" && (
-              <div className="space-y-2">
-                <p className="mt-2 text-sm font-medium text-foreground/90">Spatial scoring…</p>
-                <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                  <motion.div
-                    className="h-full bg-primary"
-                    initial={{ x: "-40%" }}
-                    animate={{ x: "120%" }}
-                    transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }}
-                  />
-                </div>
-                <div className="space-y-1 text-[11px] text-muted-foreground">
-                  <p>Scanning transmission proximity…</p>
-                  <p>Checking wildfire exposure…</p>
-                  <p>Intersecting equity-priority areas…</p>
-                </div>
-              </div>
-            )}
-            {analysisState === "relocating" && (
-              <div className="space-y-2">
-                <p className="mt-2 text-sm font-medium text-foreground/90">Searching candidates…</p>
-                <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                  <motion.div
-                    className="h-full bg-sky-400/70"
-                    initial={{ x: "-35%" }}
-                    animate={{ x: "120%" }}
-                    transition={{ duration: 0.95, repeat: Infinity, ease: "linear" }}
-                  />
-                </div>
-                <div className="space-y-1 text-[11px] text-muted-foreground">
-                  <p>Scoring candidate grid…</p>
-                  <p>Preserving corridor access where possible…</p>
-                </div>
-              </div>
-            )}
-            {analysisState === "result" && result && (
-              <div>
-                <p className="mt-2 text-sm font-medium text-foreground/90">
-                  {tone === "bad" ? "High conflict pressure" : tone === "caution" ? "Manageable risk" : "Strong candidate"}
-                </p>
-                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                  {conflicts.length ? "Top drivers (hover to highlight on map)" : "No conflicts detected on active layers."}
-                </p>
-              </div>
-            )}
+          {analysisState === "result" && result && conflicts.length > 0 && (
+            <ul className="space-y-3">
+              {conflicts.map((c) => {
+                const w = approxConflictWeight(c);
+                const { line, title } = conflictAccent(c.layerId);
+                const shortLabel = c.label.replace(/\s+overlap$/i, "").replace(/\s+nearby.*$/i, "");
+                return (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onMouseEnter={() => onHoverConflict(c.layerId)}
+                      onMouseLeave={() => onHoverConflict(null)}
+                      className="w-full text-left transition hover:opacity-95"
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="mt-1.5 h-px w-3 shrink-0 bg-transparent" />
+                        <div className="min-w-0 flex-1 border-l-2 pl-2.5" style={{ borderColor: line }}>
+                          <p className="text-[13px] font-medium" style={{ color: title }}>
+                            {shortLabel}
+                            <span className="tabular-nums text-[#94a3b8]"> (+{w})</span>
+                          </p>
+                          <p className="mt-0.5 text-[12px] leading-snug text-[#94a3b8]">{c.detail}</p>
+                        </div>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
-            <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Next</p>
-              <p className="mt-1 text-[12px] leading-snug text-foreground/90">{nextAction}</p>
-            </div>
-          </div>
+          {analysisState === "result" && result && conflicts.length === 0 && (
+            <p className="text-[13px] leading-relaxed text-emerald-400/90">No conflicts on active layers for this footprint.</p>
+          )}
         </div>
 
         <AnimatePresence>
-          {relocateSuccess && (
+          {recommendation ? (
             <motion.div
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 6 }}
-              transition={{ duration: 0.25 }}
-              className="mt-4 shrink-0 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[12px] font-medium text-emerald-200"
+              className="border-t border-white/[0.06] bg-[#0a0e14]/80 px-5 py-4"
             >
-              Better site found — footprint updated.
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {compare.beforeScore !== null && compare.afterScore !== null && (
-          <div className="mt-4 rounded-xl border border-white/[0.06] bg-black/20 px-3 py-2.5">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Comparison</p>
-            <p className="mt-1 text-[12px] font-semibold text-foreground/95">
-              Risk {compare.beforeScore} → {compare.afterScore}
-              {compare.movedKm !== null ? (
-                <span className="text-[12px] font-medium text-muted-foreground"> · moved {compare.movedKm.toFixed(1)} km</span>
-              ) : null}
-            </p>
-            {compare.headline && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{compare.headline}</p>}
-          </div>
-        )}
-
-        {analysisState === "result" && result && conflicts.length > 0 && (
-          <div className="mt-5 min-h-0 flex-1 border-t border-white/[0.06] pt-4">
-            <p className="text-[11px] font-medium text-foreground/90">Top drivers</p>
-            <div className="mt-2 max-h-[34vh] space-y-1.5 overflow-y-auto pr-1 sm:max-h-[38vh]">
-              {conflicts.map((c) => (
+              <p className="text-[12px] italic leading-relaxed text-[#94a3b8]">{recommendation}</p>
+              {onApplySuggestion && canApplySuggestion ? (
                 <button
-                  key={c.id}
                   type="button"
-                  onMouseEnter={() => onHoverConflict(c.layerId)}
-                  onMouseLeave={() => onHoverConflict(null)}
-                  className="flex w-full items-start gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-2.5 py-2 text-left transition hover:border-white/15 hover:bg-white/[0.04]"
+                  onClick={onApplySuggestion}
+                  className="mt-2.5 text-[12px] font-semibold text-[#60a5fa] transition hover:text-[#93c5fd]"
                 >
-                  <span
-                    className="mt-1 h-6 w-1 shrink-0 rounded-full"
-                    style={{ backgroundColor: layerAccent(c.layerId) }}
-                    aria-hidden
-                  />
-                  <span
-                    className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: severityAccent(c.severity) }}
-                    aria-hidden
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[12px] font-medium leading-snug text-foreground [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden">
-                      {c.label}
-                    </span>
-                    <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden">
-                      {c.detail}
-                    </span>
-                  </span>
+                  Apply suggestion →
                 </button>
-              ))}
-            </div>
-          </div>
-        )}
+              ) : null}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </motion.aside>
   );

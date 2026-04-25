@@ -29,7 +29,10 @@ export function parseCopilotCommand(text: string): ParsedCopilotCommand {
     wantsWildfire: /\bwildfire\b|\bfire\b|\busda\b/i.test(lower),
     wantsEJ: /\bejscreen\b|\bdisadvantaged\b|\bjustice\b|\bej\b/i.test(lower),
     wantsGrid: /\beia\b|\bsubstation\b|\bswitchyard\b|\bgrid\b/i.test(lower),
-    regionHint: /\bcalifornia\b|\bca\b|\bnorcal\b|\bsocal\b|\bcentral valley\b/.test(lower)
+    regionHint:
+      /\bcalifornia\b|\bclaifornia\b|\bcalif\.?\b|\bin\s+ca\b|\bnorcal\b|\bsocal\b|\bcentral valley\b|\bsilicon valley\b|\bsf bay\b|\blos angeles\b|\bsan diego\b|\bsacramento\b|\bfresno\b|\bbay area\b/.test(
+        lower,
+      )
       ? "california"
       : /\barizona\b|\baz\b|\bnevada\b|\bnv\b|\bnew\s?mexico\b|\bnm\b|\bsouthwest\b/.test(
       lower,
@@ -68,6 +71,25 @@ function delay(ms: number, signal?: AbortSignal) {
       { once: true },
     );
   });
+}
+
+function pickFlyZoom(regionHint: ParsedCopilotCommand["regionHint"]): number {
+  switch (regionHint) {
+    case "california":
+      return 6.35;
+    case "southwest":
+      return 6.15;
+    case "texas":
+      return 6.05;
+    case "midwest":
+      return 5.9;
+    case "southeast":
+      return 5.95;
+    case "northeast":
+      return 5.9;
+    default:
+      return Math.max(5.6, INITIAL_VIEW.zoom);
+  }
 }
 
 function pickInitialCenter(parsed: ParsedCopilotCommand): [number, number] {
@@ -132,7 +154,9 @@ export async function runSpatialCopilotDemo(args: {
   onLog("receipt · mission_received");
   await delay(220, signal);
   onLog(
-    `receipt · constraints_parsed · acres=${acres.toFixed(0)} · max_risk=${maxRisk} · focus=${
+    `receipt · constraints_parsed · acres=${acres.toFixed(0)} · max_risk=${maxRisk} · region=${
+      parsed.regionHint ?? "viewport"
+    } · focus=${
       parsed.wantsTransmission ? "transmission " : ""
     }${parsed.wantsWildfire ? "wildfire " : ""}${parsed.wantsEJ ? "equity " : ""}${parsed.wantsGrid ? "grid " : ""}`.trim(),
   );
@@ -145,7 +169,7 @@ export async function runSpatialCopilotDemo(args: {
   await delay(260, signal);
 
   let center = pickInitialCenter(parsed);
-  onFly(center, Math.max(8.2, INITIAL_VIEW.zoom - 0.2));
+  onFly(center, pickFlyZoom(parsed.regionHint));
 
   const runEvaluate = (label: string) => {
     const shape = buildShape(shapeKind, center, radiusMeters, `copilot-${Date.now()}`);
@@ -171,14 +195,14 @@ export async function runSpatialCopilotDemo(args: {
     onLog("analysis · high_wildfire_exposure → shift_west");
     await delay(280, signal);
     center = [center[0] - 0.12, center[1] + 0.01];
-    onFly(center, 9.0);
+    onFly(center, Math.min(8.6, pickFlyZoom(parsed.regionHint) + 2.0));
     ({ shape, result } = runEvaluate("evaluate #2 (west shift)"));
     await delay(320, signal);
   } else if (worst?.layerId === "hifld-transmission" || parsed.wantsTransmission) {
     onLog("analysis · transmission_proximity_ok → micro_adjust_anchor");
     await delay(260, signal);
     center = [center[0] - 0.04, center[1] + 0.06];
-    onFly(center, 9.0);
+    onFly(center, Math.min(8.6, pickFlyZoom(parsed.regionHint) + 2.0));
     ({ shape, result } = runEvaluate("evaluate #2 (micro-adjust)"));
     await delay(320, signal);
   } else {

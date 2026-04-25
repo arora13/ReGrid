@@ -47,3 +47,16 @@ export function distanceMeters(a: [number, number], b: [number, number]): number
     Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
 }
+
+/** First linear ring of the site footprint (GeoJSON polygon), without duplicate closing vertex. */
+export function siteFootprintRing(shape: DrawnShape): [number, number][] {
+  const coords = shape.geojson.geometry?.coordinates?.[0];
+  if (!coords?.length) return [];
+  const out = coords.map((c) => [c[0], c[1]] as [number, number]);
+  if (out.length >= 2) {
+    const a = out[0];
+    const b = out[out.length - 1];
+    if (a[0] === b[0] && a[1] === b[1]) out.pop();
+  }
+  return out;
+}

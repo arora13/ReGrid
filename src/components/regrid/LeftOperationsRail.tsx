@@ -1,11 +1,9 @@
-import { motion } from "framer-motion";
 import type { ReactNode } from "react";
-import type { LayerDef, LayerId, ShapeKind } from "@/lib/regrid/types";
-import { ChevronDown, Circle, Hexagon, Square, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import type { LayerDef, LayerId, ProjectKind, ShapeKind } from "@/lib/regrid/types";
+import { Circle, Hand, Hexagon, Ruler, Square, Trash2 } from "lucide-react";
+import { useMemo } from "react";
 
-export type ProjectKind = "solar" | "battery" | "grid-tied";
+export type { ProjectKind } from "@/lib/regrid/types";
 
 interface LeftOperationsRailProps {
   layers: LayerDef[];
@@ -18,7 +16,7 @@ interface LeftOperationsRailProps {
   onAcreageChange: (acres: number) => void;
 
   activeTool: ShapeKind | null;
-  onSelectTool: (kind: ShapeKind) => void;
+  onSelectTool: (kind: ShapeKind | null) => void;
   hasShape: boolean;
   onAnalyze: () => void;
   onFindBetterSite: () => void;
@@ -27,10 +25,13 @@ interface LeftOperationsRailProps {
   copilotRunning: boolean;
 }
 
-const TOOLS: { kind: ShapeKind; label: string; icon: ReactNode }[] = [
-  { kind: "circle", label: "Circle", icon: <Circle className="h-4 w-4" strokeWidth={1.75} /> },
-  { kind: "square", label: "Square", icon: <Square className="h-4 w-4" strokeWidth={1.75} /> },
-  { kind: "hexagon", label: "Hex", icon: <Hexagon className="h-4 w-4" strokeWidth={1.75} /> },
+const TOOL_BASE =
+  "flex h-10 w-10 items-center justify-center rounded-md border transition disabled:cursor-not-allowed disabled:opacity-40";
+
+const SHAPE_TOOLS: { kind: ShapeKind; label: string; icon: ReactNode }[] = [
+  { kind: "circle", label: "Circle site", icon: <Circle className="h-[18px] w-[18px]" strokeWidth={1.6} /> },
+  { kind: "square", label: "Square site", icon: <Square className="h-[18px] w-[18px]" strokeWidth={1.6} /> },
+  { kind: "hexagon", label: "Hex site", icon: <Hexagon className="h-[18px] w-[18px]" strokeWidth={1.6} /> },
 ];
 
 export function LeftOperationsRail({
@@ -51,266 +52,142 @@ export function LeftOperationsRail({
   copilotRunning,
 }: LeftOperationsRailProps) {
   const busy = analysisState === "analyzing" || analysisState === "relocating" || copilotRunning;
-  const [layersOpen, setLayersOpen] = useState(false);
-  const [railOpen, setRailOpen] = useState(true);
 
-  const enabledCount = useMemo(() => enabledLayers.size, [enabledLayers]);
+  const missions = useMemo(
+    () =>
+      [
+        { id: "solar" as const, label: "Solar" },
+        { id: "battery" as const, label: "Battery" },
+        { id: "grid-tied" as const, label: "Grid-tied" },
+      ] as const,
+    [],
+  );
 
-  const step = !hasShape
-    ? 1
-    : analysisState === "result"
-      ? 3
-      : 2;
+  const activeShape = `${TOOL_BASE} border-sky-400/50 bg-sky-500/15 text-sky-200`;
+  const idleShape = `${TOOL_BASE} border-white/[0.08] bg-white/[0.04] text-white/55 hover:border-white/15 hover:bg-white/[0.07] hover:text-white/80`;
 
   return (
-    <motion.aside
-      initial={{ y: -10, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
-      className="pointer-events-auto absolute left-4 top-4 z-20 w-[min(300px,calc(100vw-1.5rem))] sm:left-8 sm:top-8 sm:w-[min(300px,calc(100vw-2.5rem))]"
-    >
-      <div className="flex gap-2">
-        <div className={`glass flex max-h-[calc(100vh-220px)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] shadow-sm transition-all duration-300 ${railOpen ? "w-full sm:w-[300px]" : "hidden"}`}>
-
-        {/* Fixed title header */}
-        <div className="shrink-0 border-b border-white/[0.06] px-4 py-3.5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-baseline gap-2">
-              <h1 className="truncate text-sm font-semibold tracking-tight">ReGrid</h1>
-              <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                Demo
-              </span>
-            </div>
-            <button
-              type="button"
-              title="Clear footprint"
-              onClick={onClear}
-              disabled={!hasShape || busy}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-muted-foreground transition hover:border-white/20 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-            </button>
-          </div>
-        </div>
-
-        {/* Scrollable controls */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="space-y-4 p-4">
-
-            {/* Workflow tracker */}
-            <div className="rounded-xl border border-white/[0.06] bg-black/15 px-3 py-2.5">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[10px] font-medium text-foreground/90">Workflow</p>
-                <p className="text-[10px] text-muted-foreground">Step {step} / 3</p>
-              </div>
-              <div className="mt-1.5 grid grid-cols-3 gap-1">
-                {[
-                  { n: 1, label: "Place" },
-                  { n: 2, label: "Analyze" },
-                  { n: 3, label: "Decide" },
-                ].map((s) => (
-                  <div
-                    key={s.n}
-                    className={`rounded-lg px-2 py-1 text-center text-[10px] font-medium ${
-                      step === s.n ? "bg-white/[0.06] text-foreground" : "text-muted-foreground"
-                    }`}
-                  >
-                    {s.label}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Mission */}
-            <div>
-              <p className="mb-2 text-[10px] font-medium text-foreground/90">Mission</p>
-              <div className="grid grid-cols-3 gap-1.5">
-                {(
-                  [
-                    { id: "solar" as const, label: "Solar" },
-                    { id: "battery" as const, label: "Battery" },
-                    { id: "grid-tied" as const, label: "Grid-tied" },
-                  ] as const
-                ).map((p) => {
-                  const active = projectKind === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => onProjectKindChange(p.id)}
-                      disabled={busy}
-                      className={`rounded-xl border px-2 py-1.5 text-[11px] font-semibold transition ${
-                        active
-                          ? "border-sky-400/35 bg-sky-400/10 text-sky-100"
-                          : "border-white/10 bg-white/[0.02] text-muted-foreground hover:border-white/20 hover:text-foreground"
-                      } disabled:cursor-not-allowed disabled:opacity-40`}
-                    >
-                      {p.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Site size */}
-            <div>
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[10px] font-medium text-foreground/90">Site size</p>
-                <p className="text-[10px] tabular-nums text-muted-foreground">{acreage} ac</p>
-              </div>
-              <input
-                type="range"
-                min={10}
-                max={500}
-                step={5}
-                value={acreage}
-                disabled={busy}
-                onChange={(e) => onAcreageChange(Number(e.target.value))}
-                className="mt-2 w-full accent-sky-400 disabled:opacity-40"
-              />
-            </div>
-
-            {/* Footprint tool */}
-            <div>
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[10px] font-medium text-foreground/90">Footprint</p>
-                <p className="text-[10px] text-muted-foreground">{hasShape ? "Anchored" : "None"}</p>
-              </div>
-              <div className="mt-2 grid grid-cols-3 gap-1.5">
-                {TOOLS.map((t) => {
-                  const active = activeTool === t.kind;
-                  return (
-                    <button
-                      key={t.kind}
-                      type="button"
-                      onClick={() => onSelectTool(t.kind)}
-                      disabled={busy}
-                      className={`flex flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2 text-[10px] font-medium transition ${
-                        active
-                          ? "border-primary/45 bg-primary/10 text-primary"
-                          : "border-white/10 bg-white/[0.02] text-muted-foreground hover:border-white/20 hover:text-foreground"
-                      } disabled:cursor-not-allowed disabled:opacity-40`}
-                    >
-                      <span className="text-foreground/90">{t.icon}</span>
-                      {t.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Evaluate */}
-            <div className="border-t border-white/[0.06] pt-4">
-              <p className="mb-2 text-[10px] font-medium text-foreground/90">Evaluate</p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={onAnalyze}
-                  disabled={!hasShape || busy}
-                  className="rounded-xl bg-primary px-3 py-2 text-[12px] font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {analysisState === "analyzing" ? "Analyzing…" : "Analyze site"}
-                </button>
-                <button
-                  type="button"
-                  onClick={onFindBetterSite}
-                  disabled={!hasShape || busy}
-                  className="rounded-xl border border-white/15 bg-white/[0.03] px-3 py-2 text-[12px] font-semibold text-foreground/90 transition hover:border-white/25 hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {analysisState === "relocating" ? "Searching…" : "Find better site"}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Layers section (inside scroll area) */}
-          <div className="border-t border-white/[0.06]">
-            <button
-              type="button"
-              onClick={() => setLayersOpen((v) => !v)}
-              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-white/[0.02]"
-            >
-              <p className="text-[10px] font-medium text-foreground/90">Layers</p>
-              <div className="flex items-center gap-2">
-                <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  {enabledCount}/{layers.length}
-                </span>
-                <ChevronDown
-                  className={`h-3.5 w-3.5 text-muted-foreground transition ${layersOpen ? "rotate-180" : ""}`}
-                />
-              </div>
-            </button>
-
-            {layersOpen && (
-              <div className="space-y-1.5 px-3 pb-3">
-                {layers.map((layer) => {
-                  const on = enabledLayers.has(layer.id);
-                  return (
-                    <button
-                      key={layer.id}
-                      type="button"
-                      onClick={() => onToggleLayer(layer.id)}
-                      className={`flex w-full items-center gap-3 rounded-xl border px-2.5 py-2 text-left transition ${
-                        on
-                          ? "border-white/15 bg-white/[0.04]"
-                          : "border-white/[0.06] bg-transparent hover:border-white/15 hover:bg-white/[0.03]"
-                      }`}
-                    >
-                      <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: layer.color }}
-                        aria-hidden
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[11px] font-medium leading-snug text-foreground">
-                          {layer.name}
-                        </div>
-                        <div className="truncate text-[10px] text-muted-foreground">
-                          {layer.agency}
-                        </div>
-                      </div>
-                      <span
-                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition ${
-                          on ? "border-primary/35 bg-primary/15" : "border-white/10 bg-black/20"
-                        }`}
-                        aria-hidden
-                      >
-                        <span
-                          className={`ml-0.5 inline-block h-4 w-4 rounded-full bg-white/90 transition ${
-                            on ? "translate-x-3.5" : "translate-x-0.5"
-                          }`}
-                        />
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      {!railOpen && (
+    <>
+      <aside className="pointer-events-auto absolute left-3 top-3 z-20 flex flex-col gap-1 rounded-lg border border-white/[0.06] bg-[#0d1117]/95 p-1 shadow-xl backdrop-blur-xl">
         <button
           type="button"
-          onClick={() => setRailOpen(true)}
-          className="glass flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-black/40 text-foreground shadow-sm transition hover:bg-white/[0.05]"
-          title="Open operations rail"
+          title="Pan map"
+          className={activeTool === null ? activeShape : idleShape}
+          onClick={() => onSelectTool(null)}
         >
-          <ChevronRight className="h-5 w-5" />
+          <Hand className="h-[18px] w-[18px]" strokeWidth={1.6} />
         </button>
-      )}
-      {railOpen && (
+        {SHAPE_TOOLS.map((t) => (
+          <button
+            key={t.kind}
+            type="button"
+            title={t.label}
+            disabled={busy}
+            className={activeTool === t.kind ? activeShape : idleShape}
+            onClick={() => onSelectTool(t.kind)}
+          >
+            {t.icon}
+          </button>
+        ))}
         <button
           type="button"
-          onClick={() => setRailOpen(false)}
-          className="glass flex h-10 w-8 shrink-0 items-center justify-center rounded-r-2xl border-y border-r border-white/[0.08] bg-black/20 text-muted-foreground shadow-sm transition hover:bg-white/[0.05] hover:text-foreground"
-          title="Collapse operations rail"
-          style={{ transform: "translateX(-4px)" }}
+          title={`Site size · ${acreage} acres (adjust in site card)`}
+          disabled={busy}
+          className={idleShape}
         >
-          <ChevronRight className="h-4 w-4 rotate-180" />
+          <Ruler className="h-[18px] w-[18px]" strokeWidth={1.6} />
         </button>
-      )}
-      </div>
-    </motion.aside>
+        <div className="my-0.5 h-px bg-white/[0.08]" />
+        <button
+          type="button"
+          title="Clear footprint"
+          disabled={!hasShape || busy}
+          className={`${TOOL_BASE} border-white/[0.08] bg-white/[0.04] text-white/55 hover:border-rose-400/35 hover:bg-rose-500/10 hover:text-rose-200 disabled:opacity-35`}
+          onClick={onClear}
+        >
+          <Trash2 className="h-[17px] w-[17px]" strokeWidth={1.6} />
+        </button>
+      </aside>
+
+      <aside className="pointer-events-auto absolute left-[4.25rem] top-3 z-20 w-[min(240px,calc(100vw-6rem))] rounded-lg border border-white/[0.06] bg-[#0d1117]/95 p-3 shadow-xl backdrop-blur-xl">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">Site</p>
+        <div className="mt-2 flex gap-1">
+          {missions.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              disabled={busy}
+              onClick={() => onProjectKindChange(m.id)}
+              className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] font-semibold transition ${
+                projectKind === m.id
+                  ? "border-sky-400/40 bg-sky-500/15 text-sky-100"
+                  : "border-white/[0.08] bg-white/[0.03] text-white/55 hover:border-white/15 hover:text-white/85"
+              } disabled:opacity-40`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="text-[11px] text-[#94a3b8]">Size</span>
+          <span className="text-[11px] tabular-nums text-[#cbd5e1]">{acreage} ac</span>
+        </div>
+        <input
+          type="range"
+          min={10}
+          max={500}
+          step={5}
+          value={acreage}
+          disabled={busy}
+          onChange={(e) => onAcreageChange(Number(e.target.value))}
+          className="mt-1 w-full accent-sky-400 disabled:opacity-40"
+        />
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onAnalyze}
+            disabled={!hasShape || busy}
+            className="rounded-md bg-[#60a5fa] px-2 py-2 text-[11px] font-semibold text-[#0a0e14] shadow-sm transition hover:bg-[#93c5fd] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {analysisState === "analyzing" ? "Scoring…" : "Run analysis"}
+          </button>
+          <button
+            type="button"
+            onClick={onFindBetterSite}
+            disabled={!hasShape || busy}
+            className="rounded-md border border-white/[0.12] bg-white/[0.05] px-2 py-2 text-[11px] font-semibold text-white/85 transition hover:bg-white/[0.09] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {analysisState === "relocating" ? "Searching…" : "Optimize"}
+          </button>
+        </div>
+      </aside>
+
+      <aside className="pointer-events-auto absolute bottom-24 left-3 z-20 w-[min(260px,calc(100vw-1.5rem))] rounded-lg border border-white/[0.06] bg-[#0d1117]/95 p-3 shadow-xl backdrop-blur-xl">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">Layers</p>
+        <ul className="mt-2 max-h-[28vh] space-y-1.5 overflow-y-auto pr-1">
+          {layers.map((layer) => {
+            const on = enabledLayers.has(layer.id);
+            return (
+              <li key={layer.id}>
+                <label className="flex cursor-pointer items-center gap-3 rounded-md px-1 py-1.5 transition hover:bg-white/[0.04]">
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={() => onToggleLayer(layer.id)}
+                    className="h-3.5 w-3.5 rounded border-[#334155] bg-[#0a0e14] text-[#60a5fa] focus:ring-[#60a5fa]/30"
+                  />
+                  <span
+                    className="h-3 w-3 shrink-0 rounded-[2px] border border-white/[0.08] shadow-inner"
+                    style={{ backgroundColor: on ? layer.color : "transparent", boxShadow: on ? `0 0 0 1px ${layer.color}55` : undefined }}
+                    aria-hidden
+                  />
+                  <span className="min-w-0 flex-1 truncate text-[12px] leading-tight text-[#e2e8f0]">{layer.name}</span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      </aside>
+    </>
   );
 }

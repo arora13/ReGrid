@@ -431,9 +431,10 @@ export function MapCanvas({
 
   return (
     <div className="regrid-map-host absolute inset-0 z-0 h-full min-h-full w-full min-w-full">
+      <div className="regrid-map-hatch pointer-events-none absolute inset-0 z-[1]" aria-hidden />
       <div
         ref={containerRef}
-        className="absolute inset-0 h-full w-full"
+        className="absolute inset-0 z-0 h-full w-full"
         style={{ cursor: crosshair ? "crosshair" : "grab" }}
       />
       {mapBooting && !mapError ? (

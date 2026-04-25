@@ -5,12 +5,21 @@ import { TokenGate } from "@/components/regrid/TokenGate";
 import { SpatialCopilot } from "@/components/regrid/SpatialCopilot";
 import { LeftOperationsRail } from "@/components/regrid/LeftOperationsRail";
 import { RiskScoreHUD } from "@/components/regrid/RiskScoreHUD";
+import { WorkspaceHeader, workspaceProjectLabel } from "@/components/regrid/WorkspaceHeader";
 import { LAYERS } from "@/lib/regrid/layers";
 import { loadManifestLayers } from "@/lib/regrid/datasets";
 import { buildShape, distanceMeters } from "@/lib/regrid/geo";
 import { analyzeShape, findOptimalRelocation } from "@/lib/regrid/analyze";
 import { getPublicMapboxTokenFromEnv } from "@/lib/regrid/env";
-import type { AnalysisResult, Conflict, DrawnShape, LayerDef, LayerId, ShapeKind } from "@/lib/regrid/types";
+import type {
+  AnalysisResult,
+  Conflict,
+  DrawnShape,
+  LayerDef,
+  LayerId,
+  ProjectKind,
+  ShapeKind,
+} from "@/lib/regrid/types";
 
 export const Route = createFileRoute("/")({
   // Mapbox/WebGL must not run during SSR — avoids blank maps after hydration.
@@ -36,8 +45,6 @@ export const Route = createFileRoute("/")({
 
 const TOKEN_KEY = "regrid:mapbox-token";
 type AnalysisState = "idle" | "analyzing" | "result" | "relocating";
-
-type ProjectKind = "solar" | "battery" | "grid-tied";
 
 function acresToRadiusMeters(acres: number) {
   const a = Math.max(1, acres);
@@ -100,6 +107,20 @@ function RegridApp() {
   const flyToRef = useRef<(c: [number, number], z?: number) => void>(() => {});
 
   const radiusMeters = useMemo(() => acresToRadiusMeters(acreage), [acreage]);
+  const siteAreaKm2Label = useMemo(() => {
+    const km2 = (acreage * 4046.8564224) / 1e6;
+    return km2 < 10 ? km2.toFixed(2) : km2.toFixed(1);
+  }, [acreage]);
+
+  const copilotStatusLine = useMemo(() => {
+    if (copilotRunning) return "Copilot is evaluating your request…";
+    if (analysisState === "analyzing") return "Evaluating protected land overlap";
+    if (analysisState === "relocating") return "Searching for a lower-risk footprint nearby…";
+    if (result && analysisState === "result")
+      return `Siting score ${result.score} / 100 — hover drivers on the right to highlight layers`;
+    if (shape) return "Ready to run analysis or describe a new goal below";
+    return "Describe a siting goal — e.g. lowest-risk solar site in Central Valley, CA";
+  }, [copilotRunning, analysisState, result, shape]);
 
   const handleMapClick = (lngLat: [number, number]) => {
     if (copilotRunning) return;
@@ -247,7 +268,8 @@ function RegridApp() {
   }
 
   return (
-    <div className="fixed inset-0 z-0 flex flex-col overflow-hidden bg-background ring-1 ring-inset ring-white/[0.06]">
+    <div className="regrid-workspace fixed inset-0 z-0 flex flex-col overflow-hidden bg-[#0a0e14] ring-1 ring-inset ring-white/[0.06]">
+      <WorkspaceHeader projectKind={projectKind} />
       <div className="relative min-h-0 min-w-0 flex-1">
         <div className="absolute inset-0 z-0 min-h-0 min-w-0">
           <MapCanvas
@@ -265,6 +287,19 @@ function RegridApp() {
             }}
           />
         </div>
+
+        {shape ? (
+          <div className="pointer-events-none absolute left-1/2 top-[36%] z-[15] w-[min(92vw,320px)] -translate-x-1/2 -translate-y-full">
+            <div className="rounded-md border border-[#60a5fa]/30 bg-[#0d1117]/95 px-3 py-2 text-left shadow-xl backdrop-blur-xl">
+              <p className="text-[11px] font-semibold tracking-wide text-[#f1f5f9]">
+                SITE · {workspaceProjectLabel(projectKind)}
+              </p>
+              <p className="mt-0.5 text-[10px] leading-snug text-[#94a3b8]">
+                {siteAreaKm2Label} km² · {shape.kind} · {(shape.radiusMeters / 1000).toFixed(1)} km
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         <LeftOperationsRail
           layers={layers}
@@ -284,16 +319,18 @@ function RegridApp() {
           copilotRunning={copilotRunning}
         />
 
-        {(shape || analysisState !== "idle" || result) && (
-          <RiskScoreHUD
-            hasShape={!!shape}
-            analysisState={analysisState}
-            result={result}
-            onHoverConflict={setHighlightedConflict}
-            relocateSuccess={relocateSuccess}
-            compare={compare}
-          />
-        )}
+        <RiskScoreHUD
+          hasShape={!!shape}
+          analysisState={analysisState}
+          result={result}
+          onHoverConflict={setHighlightedConflict}
+          relocateSuccess={relocateSuccess}
+          compare={compare}
+          onApplySuggestion={handleRelocate}
+          canApplySuggestion={
+            !!shape && analysisState === "result" && !!result && result.score >= 28 && result.conflicts.length > 0
+          }
+        />
 
         {import.meta.env.DEV ? (
           <div
@@ -310,6 +347,7 @@ function RegridApp() {
         enabledLayers={enabledLayers}
         shapeKind={activeTool ?? "circle"}
         flyTo={(c, z) => flyToRef.current(c, z)}
+        statusLine={copilotStatusLine}
         onCopilotRunningChange={setCopilotRunning}
         onApplyShape={(next) => {
           setShape(next);

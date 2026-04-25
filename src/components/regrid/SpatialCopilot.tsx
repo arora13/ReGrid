@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AnalysisResult, DrawnShape, LayerDef, LayerId, ShapeKind } from "@/lib/regrid/types";
 import { runSpatialCopilotDemo } from "@/lib/regrid/copilot";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Send } from "lucide-react";
 
 interface SpatialCopilotProps {
   allLayers: LayerDef[];
@@ -12,6 +12,7 @@ interface SpatialCopilotProps {
   onApplyShape: (shape: DrawnShape | null) => void;
   onApplyAnalysis: (result: AnalysisResult | null) => void;
   onCopilotRunningChange?: (running: boolean) => void;
+  statusLine?: string;
 }
 
 export function SpatialCopilot({
@@ -22,13 +23,11 @@ export function SpatialCopilot({
   onApplyShape,
   onApplyAnalysis,
   onCopilotRunningChange,
+  statusLine = "Describe a siting goal in natural language",
 }: SpatialCopilotProps) {
-  const [open, setOpen] = useState(false);
-  const [chipsOpen, setChipsOpen] = useState(false);
-  const [command, setCommand] = useState(
-    "Find me a 50 acre site near transmission with a risk score under 20 anywhere in California.",
-  );
-  const [log, setLog] = useState<string[]>(["system · copilot_ready · bounded_tool_loop=true"]);
+  const [traceOpen, setTraceOpen] = useState(false);
+  const [command, setCommand] = useState("");
+  const [log, setLog] = useState<string[]>(["system · copilot_ready"]);
   const [running, setRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -39,29 +38,17 @@ export function SpatialCopilot({
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
-  }, [log, open]);
+  }, [log, traceOpen]);
 
   const canRun = useMemo(() => command.trim().length > 0 && !running, [command, running]);
-
-  const append = (line: string) => setLog((prev) => [...prev.slice(-220), line]);
-
-  const MISSION_CHIPS = useMemo(
-    () => [
-      "50 acres near transmission in California, risk under 20",
-      "Battery site in SoCal: avoid wildfire + EJ overlap, risk under 25",
-      "Grid-tied solar in NorCal: prioritize transmission access, risk under 35",
-    ],
-    [],
-  );
+  const append = (line: string) => setLog((prev) => [...prev.slice(-200), line]);
 
   const handleRun = async () => {
     if (!canRun) return;
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-
     setRunning(true);
-    setOpen(true);
     append("run · start");
     try {
       await runSpatialCopilotDemo({
@@ -80,11 +67,9 @@ export function SpatialCopilot({
       append("run · complete");
     } catch (e) {
       const err = e as { name?: string };
-      if (err?.name === "AbortError") {
-        append("run · aborted");
-      } else {
-        append("run · error (see console)");
-
+      if (err?.name === "AbortError") append("run · aborted");
+      else {
+        append("run · error");
         console.error(e);
       }
     } finally {
@@ -92,124 +77,66 @@ export function SpatialCopilot({
     }
   };
 
-  const handleStop = () => {
-    abortRef.current?.abort();
-  };
-
   return (
-    <div className="pointer-events-none absolute bottom-6 left-1/2 z-30 w-full max-w-[500px] -translate-x-1/2 px-4">
-      <div className="pointer-events-auto mx-auto w-full max-w-[500px] px-1 sm:px-2">
-        <motion.div
-          layout
-          className="glass overflow-hidden rounded-2xl border border-white/[0.08] shadow-sm"
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-4 pb-4 pt-8 sm:px-6">
+      <div className="pointer-events-auto mx-auto max-w-4xl">
+        <div className="mb-2.5 flex items-center gap-2.5 px-2">
+          <span
+            className={`h-2 w-2 shrink-0 rounded-full ${running ? "animate-pulse bg-[#60a5fa]" : "bg-[#60a5fa]/50"}`}
+            aria-hidden
+          />
+          <p className="text-[12px] font-normal text-[#94a3b8]">{statusLine}</p>
+        </div>
+
+        <form
+          className="regrid-copilot-pill flex items-stretch gap-1 border border-white/[0.08] bg-[#0d1117]/95 py-1 pl-4 pr-1 backdrop-blur-xl"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleRun();
+          }}
         >
-          <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-2.5">
-            <div className="min-w-0">
-              <p className="text-[12px] font-semibold text-foreground/95">Spatial copilot</p>
-              <p className="truncate text-[11px] text-muted-foreground">
-                Command bar · tool receipts · bounded search
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setOpen((v) => !v)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground/90 transition hover:border-white/20 hover:bg-white/[0.05]"
-              >
-                Trace
-                {open ? (
-                  <ChevronUp className="h-3.5 w-3.5 opacity-70" />
-                ) : (
-                  <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={handleStop}
-                disabled={!running}
-                className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-white/20 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Stop
-              </button>
-            </div>
-          </div>
-
-          <AnimatePresence initial={false}>
-            {open && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25 }}
-                className="border-b border-white/[0.06]"
-              >
-                <div className="max-h-32 overflow-y-auto px-4 py-2.5 font-mono text-[11px] leading-snug text-foreground/90">
-                  {log.map((line, idx) => (
-                    <div key={`${idx}-${line}`} className="whitespace-pre-wrap">
-                      {line}
-                    </div>
-                  ))}
-                  <div ref={endRef} />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <form
-            className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleRun();
-            }}
+          <input
+            value={command}
+            onChange={(e) => setCommand(e.target.value)}
+            disabled={running}
+            placeholder="Describe a siting goal — e.g. lowest-risk wind site near Cape Cod"
+            className="min-w-0 flex-1 border-0 bg-transparent py-3 text-[13px] text-[#f1f5f9] placeholder:text-[#64748b] focus:outline-none focus:ring-0"
+          />
+          <button
+            type="button"
+            onClick={() => setTraceOpen((v) => !v)}
+            className="hidden shrink-0 items-center gap-1 self-center rounded-full px-3 py-2 text-[11px] font-medium text-[#64748b] transition hover:bg-white/[0.05] hover:text-[#94a3b8] sm:flex"
           >
-            <input
-              value={command}
-              onChange={(e) => setCommand(e.target.value)}
-              disabled={running}
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/25"
-              placeholder='Try: "50 acres near transmission in California, risk under 20"'
-            />
-            <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
-              <button
-                type="submit"
-                disabled={!canRun}
-                className="inline-flex w-full items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
-              >
-                Run copilot
-              </button>
-            </div>
-          </form>
+            Trace
+            {traceOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            type="submit"
+            disabled={!canRun}
+            title="Run"
+            className="flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-full bg-[#60a5fa] text-[#0a0e14] transition hover:bg-[#93c5fd] disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            <Send className="h-4 w-4" strokeWidth={2.2} />
+          </button>
+        </form>
 
-          <div className="border-t border-white/[0.06] px-3 pb-2 pt-2">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                Suggested missions
-              </p>
-              <button
-                type="button"
-                onClick={() => setChipsOpen((v) => !v)}
-                className="rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1 text-[10px] text-muted-foreground transition hover:border-white/20 hover:text-foreground"
-              >
-                {chipsOpen ? "Hide" : "Show"}
-              </button>
-            </div>
-            {chipsOpen && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {MISSION_CHIPS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    disabled={running}
-                    onClick={() => setCommand(c)}
-                    className="max-w-full rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] text-foreground/90 transition hover:border-white/20 hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <span className="block max-w-[520px] truncate">{c}</span>
-                  </button>
+        <AnimatePresence initial={false}>
+          {traceOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="regrid-copilot-pill mt-2 overflow-hidden border border-white/[0.08] bg-[#0a0e14]/95"
+            >
+              <div className="max-h-28 overflow-y-auto px-4 py-2.5 font-mono text-[10px] leading-relaxed text-[#64748b]">
+                {log.map((line, idx) => (
+                  <div key={`${idx}-${line}`}>{line}</div>
                 ))}
+                <div ref={endRef} />
               </div>
-            )}
-          </div>
-        </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

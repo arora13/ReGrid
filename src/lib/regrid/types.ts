@@ -1,5 +1,7 @@
 export type ShapeKind = "circle" | "square" | "hexagon";
 
+export type ProjectKind = "solar" | "battery" | "grid-tied";
+
 export interface DrawnShape {
   id: string;
   kind: ShapeKind;
