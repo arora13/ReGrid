@@ -87,7 +87,9 @@ export function TokenGate({ onSubmit }: TokenGateProps) {
             <p className="mb-5 rounded-lg border border-white/[0.05] bg-white/[0.02] px-3 py-2.5 text-[11.5px] leading-relaxed text-slate-600">
               <span className="font-semibold text-slate-500">Tip:</span> Set{" "}
               <code className="font-mono text-cyan-500/80">VITE_MAPBOX_TOKEN</code> in{" "}
-              <code className="font-mono text-cyan-500/80">.env.local</code> to skip this screen.
+              <code className="font-mono text-cyan-500/80">.env.local</code> for local dev, or in your
+              host&apos;s env (e.g. Vercel project settings) for production — then{" "}
+              <span className="font-semibold text-slate-500">redeploy</span> so the build can embed it.
             </p>
 
             {/* Form */}

@@ -7,12 +7,23 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { nitro } from "nitro/vite";
 
+/** Ensure CI hosts (e.g. Vercel) embed public env even if env-file resolution differs per phase. */
+function defineFromProcessEnv(keys: readonly string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of keys) {
+    const v = process.env[key]?.trim();
+    if (v) out[`import.meta.env.${key}`] = JSON.stringify(v);
+  }
+  return out;
+}
+
 export default defineConfig({
   // Disable Cloudflare Workers output during `vite build` so TanStack Start can deploy on Vercel
   // using Nitro (recommended by Vercel docs for TanStack Start).
   cloudflare: false,
   plugins: [nitro({ config: { preset: "vercel" } })],
   vite: {
+    define: defineFromProcessEnv(["VITE_MAPBOX_TOKEN", "VITE_GOOGLE_CLIENT_ID"]),
     optimizeDeps: {
       include: ["mapbox-gl"],
     },
