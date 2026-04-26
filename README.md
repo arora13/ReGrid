@@ -117,6 +117,8 @@ To graduate from demo simulation to production-grade spatial intelligence, these
 
 ## Environment Variables
 
+_Copy `.env.example` to `.env.local` for local secrets._
+
 ```bash
 # Required now
 VITE_MAPBOX_TOKEN=...
