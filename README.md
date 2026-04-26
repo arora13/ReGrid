@@ -56,6 +56,7 @@ Each project footprint is represented as GeoJSON and rendered with a semi-transp
 Generalized regular-polygon generation:
 
 ```text
+# illustrative pseudocode (not executed)
 for i in 0..sides:
     angle = (i / sides) * 2pi + rotation
     dLat  = (radiusKm / 6371) * cos(angle)
