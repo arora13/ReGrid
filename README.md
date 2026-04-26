@@ -1,6 +1,6 @@
 # ReGrid
 
-**Spatial Intelligence for the Clean Energy Transition**
+**Spatial intelligence for the clean energy transition**
 
 ReGrid is an interactive siting intelligence platform for clean energy developers. Users can place a candidate project footprint (circle, square, hexagon), run spatial conflict analysis against federal-style layers, and get an optimization recommendation that relocates the site to a lower-risk area.
 
