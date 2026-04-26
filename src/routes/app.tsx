@@ -6,6 +6,7 @@ import { SpatialCopilot } from "@/components/regrid/SpatialCopilot";
 import { LeftOperationsRail } from "@/components/regrid/LeftOperationsRail";
 import { RiskScoreHUD } from "@/components/regrid/RiskScoreHUD";
 import { WorkspaceHeader, workspaceProjectLabel } from "@/components/regrid/WorkspaceHeader";
+import { UserAuthGate } from "@/components/regrid/UserAuthGate";
 import { UserDashboard } from "@/components/regrid/UserDashboard";
 import { LAYERS } from "@/lib/regrid/layers";
 import { loadManifestLayers } from "@/lib/regrid/datasets";
@@ -23,6 +24,7 @@ import {
   getUserActivity,
   logoutUser,
   type UserActivity,
+  // getUserActivity used in UserDashboard directly
 } from "@/lib/regrid/user-store";
 import type {
   AnalysisResult,
@@ -83,7 +85,10 @@ function summarizeAvoided(before: Conflict[] | null, after: Conflict[] | null): 
 
 function RegridApp() {
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
-  const [activity, setActivity] = useState<UserActivity[]>([]);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
+  // Incremented after every addUserActivity call to trigger dashboard refresh
+  const [activityKey, setActivityKey] = useState(0);
   const [token, setToken] = useState<string | null>(null);
   useEffect(() => {
     const fromEnv = getPublicMapboxTokenFromEnv();
@@ -98,7 +103,7 @@ function RegridApp() {
   useEffect(() => {
     const email = getSessionEmail();
     setSessionEmail(email);
-    if (email) setActivity(getUserActivity(email));
+    if (email) setActivityKey((k) => k + 1);
   }, []);
 
   useEffect(() => {
@@ -180,6 +185,12 @@ function RegridApp() {
     if (shape) return "Ready to run analysis or describe a new goal below";
     return "Describe a siting goal — e.g. lowest-risk solar site in Central Valley, CA";
   }, [copilotRunning, analysisState, result, shape]);
+
+  const recordActivity = (item: Omit<UserActivity, "id" | "createdAt">) => {
+    if (!sessionEmail) return;
+    addUserActivity(sessionEmail, item);
+    setActivityKey((k) => k + 1);
+  };
 
   const handleShare = () => {
     if (typeof window === "undefined") return;
@@ -269,14 +280,11 @@ function RegridApp() {
         }
         setResult(r);
         setAnalysisState("result");
-        if (sessionEmail) {
-          addUserActivity(sessionEmail, {
-            type: "analysis",
-            text: `Analyzed ${acreage} ac near ${shape.center[1].toFixed(3)}, ${shape.center[0].toFixed(3)}`,
-            score: r.score,
-          });
-          setActivity(getUserActivity(sessionEmail));
-        }
+        recordActivity({
+          type: "analysis",
+          text: `Analyzed ${acreage} ac — score ${r.score}/100`,
+          score: r.score,
+        });
       })();
     }, 2000);
   };
@@ -315,14 +323,11 @@ function RegridApp() {
         });
         if (ghostTimerRef.current) window.clearTimeout(ghostTimerRef.current);
         ghostTimerRef.current = window.setTimeout(() => setGhostShape(null), 6500);
-        if (sessionEmail) {
-          addUserActivity(sessionEmail, {
-            type: "optimize",
-            text: `Optimized site by ${(distanceMeters(beforeCenter, center) / 1000).toFixed(1)} km`,
-            score: newResult.score,
-          });
-          setActivity(getUserActivity(sessionEmail));
-        }
+        recordActivity({
+          type: "optimize",
+          text: `Optimized site ${(distanceMeters(beforeCenter, center) / 1000).toFixed(1)} km — score ${newResult.score}/100`,
+          score: newResult.score,
+        });
       }, 900);
     }, 1600);
   };
@@ -393,7 +398,14 @@ function RegridApp() {
 
   return (
     <div className="regrid-workspace fixed inset-0 z-0 flex flex-col overflow-hidden bg-[#04080e]">
-      <WorkspaceHeader projectKind={projectKind} onShare={handleShare} onExport={handleExport} />
+      <WorkspaceHeader
+        projectKind={projectKind}
+        onShare={handleShare}
+        onExport={handleExport}
+        sessionEmail={sessionEmail}
+        onSignIn={() => setShowAuth(true)}
+        onAvatarClick={() => setShowDashboard((v) => !v)}
+      />
       <div className="relative min-h-0 min-w-0 flex-1">
         <div className="absolute inset-0 z-0">
           <MapCanvas
@@ -461,15 +473,16 @@ function RegridApp() {
             result.conflicts.length > 0
           }
         />
-        {sessionEmail ? (
+        {sessionEmail && showDashboard ? (
           <UserDashboard
             email={sessionEmail}
-            activity={activity}
+            refreshKey={activityKey}
             onLogout={() => {
               logoutUser();
               setSessionEmail(null);
-              setActivity([]);
+              setShowDashboard(false);
             }}
+            onClose={() => setShowDashboard(false)}
           />
         ) : null}
       </div>
@@ -485,9 +498,7 @@ function RegridApp() {
         onCopilotRunningChange={setCopilotRunning}
         onCopilotAnswer={setCopilotAnswer}
         onCommandSubmitted={(command) => {
-          if (!sessionEmail) return;
-          addUserActivity(sessionEmail, { type: "search", text: command });
-          setActivity(getUserActivity(sessionEmail));
+          recordActivity({ type: "search", text: command });
         }}
         showAnswerInRiskPanel={!!copilotAnswer}
         onApplyShape={(next) => {
@@ -514,6 +525,18 @@ function RegridApp() {
           })();
         }}
       />
+
+      {showAuth && (
+        <UserAuthGate
+          onAuthenticated={(email) => {
+            setSessionEmail(email);
+            setActivityKey((k) => k + 1);
+            setShowAuth(false);
+            setShowDashboard(true);
+          }}
+          onDismiss={() => setShowAuth(false)}
+        />
+      )}
     </div>
   );
 }
