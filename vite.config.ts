@@ -5,8 +5,13 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { nitro } from "nitro/vite";
 
 export default defineConfig({
+  // Disable Cloudflare Workers output during `vite build` so TanStack Start can deploy on Vercel
+  // using Nitro (recommended by Vercel docs for TanStack Start).
+  cloudflare: false,
+  plugins: [nitro({ config: { preset: "vercel" } })],
   vite: {
     optimizeDeps: {
       include: ["mapbox-gl"],
