@@ -134,6 +134,20 @@ npm install
 npm run dev
 ```
 
+## Backend + PostGIS (new)
+
+The repo now includes a backend scaffold at `backend/` with FastAPI + PostGIS.
+
+Quick start:
+
+```bash
+docker compose -f docker-compose.backend.yml up --build
+```
+
+Then:
+- `GET http://localhost:8000/health`
+- `POST http://localhost:8000/api/conflict-check` (see `backend/README.md`)
+
 Open the app. If `VITE_MAPBOX_TOKEN` is set in `.env.local`, the map loads immediately; otherwise paste a token in the gate, then:
 - Toggle layers in the left operations rail (collapsible section)
 - Place a shape on map click
