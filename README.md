@@ -155,10 +155,6 @@ Open the app. If `VITE_MAPBOX_TOKEN` is set in `.env.local`, the map loads immed
 - Auto-relocate for optimized siting
 - Run the Spatial Copilot from the bottom command bar
 
-## Current Status
+## BroncoHacks 2026
 
-- UI and interaction model are implemented and polished.
-- Spatial Copilot (demo) is implemented client-side with streamed logs + fly-to choreography.
-- Conflict analysis is currently simulated client-side for demo speed.
-- Convex/FastAPI/data pipeline integration is the next milestone.
-
+This project was made for **BroncoHacks 2026**.
