@@ -82,7 +82,7 @@ Target production engine (FastAPI + Shapely):
 
 ## APIs and Integrations Needed
 
-To move from demo simulation to production-grade spatial intelligence, these APIs/services are needed:
+To graduate from demo simulation to production-grade spatial intelligence, these APIs/services are needed:
 
 ### 1) Map and Geocoding
 - **Mapbox Access Token** (`VITE_MAPBOX_TOKEN`)
