@@ -200,7 +200,7 @@ function Hero() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="mb-5 font-mono text-[10px] tracking-[0.35em] text-white/25 uppercase"
+            className="mb-5 font-mono text-[10px] tracking-[0.35em] text-white/45 uppercase"
           >
             Spatial Intelligence Platform
           </motion.p>
@@ -221,7 +221,7 @@ function Hero() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.2 }}
-            className="mt-7 max-w-lg text-[clamp(15px,1.6vw,17px)] font-light leading-relaxed text-white/35"
+            className="mt-7 max-w-lg text-[clamp(15px,1.6vw,17px)] font-light leading-relaxed text-white/58"
           >
             ReGrid scores any potential solar, wind, or battery site from 0–100 against
             federal transmission corridors, wildfire risk, and environmental equity
@@ -241,7 +241,7 @@ function Hero() {
               Use the Tool
               <ArrowRight className="h-4 w-4 transition duration-200 group-hover:translate-x-0.5" />
             </Link>
-            <span className="text-[11.5px] text-white/18">Free · No account required · Runs in browser</span>
+            <span className="text-[11.5px] text-white/38">Free · No account required · Runs in browser</span>
           </motion.div>
 
           {/* Social proof mini-strip */}
@@ -258,7 +258,7 @@ function Hero() {
             ].map(([num, label]) => (
               <div key={label} className="flex items-baseline gap-2">
                 <span className="font-serif text-[22px] text-white/50">{num}</span>
-                <span className="text-[11px] text-white/22">{label}</span>
+                <span className="text-[11px] text-white/40">{label}</span>
               </div>
             ))}
           </motion.div>
@@ -330,7 +330,7 @@ function ScoreShowcase() {
           initial={{ opacity: 0 }}
           animate={inView ? { opacity: 1 } : {}}
           transition={{ duration: 0.6 }}
-          className="font-mono text-[10px] tracking-[0.3em] text-white/22 uppercase"
+          className="font-mono text-[10px] tracking-[0.3em] text-white/45 uppercase"
         >
           The number that changes everything
         </motion.p>
@@ -358,7 +358,7 @@ function ScoreShowcase() {
           initial={{ opacity: 0, y: 8 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.35 }}
-          className="mt-4 text-[clamp(18px,2.5vw,24px)] font-light text-white/40"
+          className="mt-4 text-[clamp(18px,2.5vw,24px)] font-light text-white/62"
         >
           Every site, scored before you sign.
         </motion.p>
@@ -366,7 +366,7 @@ function ScoreShowcase() {
           initial={{ opacity: 0 }}
           animate={inView ? { opacity: 1 } : {}}
           transition={{ duration: 0.6, delay: 0.5 }}
-          className="mx-auto mt-4 max-w-md text-[14px] font-light leading-relaxed text-white/22"
+          className="mx-auto mt-4 max-w-md text-[14px] font-light leading-relaxed text-white/45"
         >
           Drop a footprint on the map. Within seconds, ReGrid returns a composite risk
           score weighted across every active federal dataset — and tells you exactly
@@ -417,7 +417,7 @@ function Features() {
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            className="font-mono text-[10px] tracking-[0.3em] text-white/22 uppercase"
+            className="font-mono text-[10px] tracking-[0.3em] text-white/45 uppercase"
           >
             What it does
           </motion.p>
@@ -426,7 +426,7 @@ function Features() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="mt-3 font-serif text-[clamp(28px,4vw,44px)] text-white/75"
+            className="mt-3 font-serif text-[clamp(28px,4vw,44px)] text-white/90"
           >
             Everything you need to site faster.
           </motion.h2>
@@ -440,7 +440,7 @@ function Features() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1, duration: 0.55 }}
-              className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.02] p-7 transition duration-300 hover:border-white/14 hover:bg-white/[0.04]"
+              className="group relative overflow-hidden rounded-2xl border border-white/[0.12] bg-white/[0.05] p-7 transition duration-300 hover:border-white/20 hover:bg-white/[0.08]"
             >
               <div
                 className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full blur-2xl transition duration-500 group-hover:scale-125"
@@ -453,8 +453,8 @@ function Features() {
                 <f.icon className="h-4.5 w-4.5" style={{ color: f.accent, opacity: 0.8 }} strokeWidth={1.5} />
               </div>
               <p className="font-mono text-[9px] tracking-[0.22em] text-white/25 uppercase">{f.tag}</p>
-              <h3 className="mt-2 text-[15px] font-semibold leading-snug text-white/70">{f.headline}</h3>
-              <p className="mt-3 text-[12.5px] font-light leading-relaxed text-white/28">{f.body}</p>
+              <h3 className="mt-2 text-[15px] font-semibold leading-snug text-white/85">{f.headline}</h3>
+              <p className="mt-3 text-[12.5px] font-light leading-relaxed text-white/50">{f.body}</p>
               <div className="mt-6 flex items-baseline gap-2">
                 <span className="font-serif text-[22px]" style={{ color: f.accent, opacity: 0.7 }}>{f.stat}</span>
                 <span className="text-[11px] text-white/22">{f.statLabel}</span>
@@ -483,7 +483,7 @@ function HowItWorks() {
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            className="font-mono text-[10px] tracking-[0.3em] text-white/22 uppercase"
+            className="font-mono text-[10px] tracking-[0.3em] text-white/45 uppercase"
           >
             How it works
           </motion.p>
@@ -517,8 +517,8 @@ function HowItWorks() {
                   <s.icon className="h-4 w-4 text-white/35" strokeWidth={1.4} />
                 </div>
               </div>
-              <h3 className="text-[15px] font-semibold text-white/65">{s.title}</h3>
-              <p className="text-[12.5px] font-light leading-relaxed text-white/28">{s.body}</p>
+              <h3 className="text-[15px] font-semibold text-white/85">{s.title}</h3>
+              <p className="text-[12.5px] font-light leading-relaxed text-white/52">{s.body}</p>
             </motion.div>
           ))}
         </div>
@@ -571,7 +571,7 @@ function FinalCTA() {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="font-mono text-[10px] tracking-[0.3em] text-white/20 uppercase"
+          className="font-mono text-[10px] tracking-[0.3em] text-white/42 uppercase"
         >
           Ready to start
         </motion.p>
@@ -580,7 +580,7 @@ function FinalCTA() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.1 }}
-          className="mt-4 font-serif text-[clamp(32px,5vw,64px)] font-normal leading-tight text-white/70"
+          className="mt-4 font-serif text-[clamp(32px,5vw,64px)] font-normal leading-tight text-white/88"
         >
           Find your lowest-risk site today.
         </motion.h2>
@@ -589,7 +589,7 @@ function FinalCTA() {
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ delay: 0.2 }}
-          className="mt-4 text-[15px] font-light text-white/22"
+          className="mt-4 text-[15px] font-light text-white/45"
         >
           Paste a free Mapbox token and you're live in under 60 seconds.
         </motion.p>
@@ -631,7 +631,7 @@ function Footer() {
 // ─── Page ───────────────────────────────────────────────────────────────────
 function LandingPage() {
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#04080e] text-white">
+    <div className="relative min-h-screen overflow-x-hidden bg-[#060d1c] text-white">
       <Nav />
       <Hero />
       <DataStrip />

@@ -6,6 +6,8 @@ import { SpatialCopilot } from "@/components/regrid/SpatialCopilot";
 import { LeftOperationsRail } from "@/components/regrid/LeftOperationsRail";
 import { RiskScoreHUD } from "@/components/regrid/RiskScoreHUD";
 import { WorkspaceHeader, workspaceProjectLabel } from "@/components/regrid/WorkspaceHeader";
+import { UserAuthGate } from "@/components/regrid/UserAuthGate";
+import { UserDashboard } from "@/components/regrid/UserDashboard";
 import { LAYERS } from "@/lib/regrid/layers";
 import { loadManifestLayers } from "@/lib/regrid/datasets";
 import { clampLngLatToCalifornia, LOCAL_RELOCATE_MAX_OFFSET_DEG } from "@/lib/regrid/california";
@@ -16,6 +18,13 @@ import {
   mergeFederalScreenIntoAnalysis,
 } from "@/lib/regrid/real-dataset-screen";
 import { getPublicMapboxTokenFromEnv } from "@/lib/regrid/env";
+import {
+  addUserActivity,
+  getSessionEmail,
+  getUserActivity,
+  logoutUser,
+  type UserActivity,
+} from "@/lib/regrid/user-store";
 import type {
   AnalysisResult,
   Conflict,
@@ -64,12 +73,23 @@ function summarizeAvoided(before: Conflict[] | null, after: Conflict[] | null): 
 }
 
 function RegridApp() {
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+  const [activity, setActivity] = useState<UserActivity[]>([]);
   const [token, setToken] = useState<string | null>(null);
   useEffect(() => {
     const fromEnv = getPublicMapboxTokenFromEnv();
-    if (fromEnv) { setToken(fromEnv); return; }
+    if (fromEnv) {
+      setToken(fromEnv);
+      return;
+    }
     const saved = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
     if (saved) setToken(saved);
+  }, []);
+
+  useEffect(() => {
+    const email = getSessionEmail();
+    setSessionEmail(email);
+    if (email) setActivity(getUserActivity(email));
   }, []);
 
   const [enabledLayers, setEnabledLayers] = useState<Set<LayerId>>(
@@ -121,7 +141,12 @@ function RegridApp() {
   const handleMapClick = (lngLat: [number, number]) => {
     if (copilotRunning || !activeTool) return;
     setCopilotAnswer(null);
-    const next = buildShape(activeTool, clampLngLatToCalifornia(lngLat), radiusMeters, `shape-${Date.now()}`);
+    const next = buildShape(
+      activeTool,
+      clampLngLatToCalifornia(lngLat),
+      radiusMeters,
+      `shape-${Date.now()}`,
+    );
     setShape(next);
     setGhostShape(null);
     setShapePulse(true);
@@ -136,7 +161,8 @@ function RegridApp() {
   const handleToggleLayer = (id: LayerId) => {
     setEnabledLayers((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
     if (result) setResult(null);
@@ -158,9 +184,19 @@ function RegridApp() {
             const snap = await federalScreenFootprintFn({ data: { ring } });
             r = mergeFederalScreenIntoAnalysis(r, snap);
           }
-        } catch { /* keep mock-only result */ }
+        } catch {
+          /* keep mock-only result */
+        }
         setResult(r);
         setAnalysisState("result");
+        if (sessionEmail) {
+          addUserActivity(sessionEmail, {
+            type: "analysis",
+            text: `Analyzed ${acreage} ac near ${shape.center[1].toFixed(3)}, ${shape.center[0].toFixed(3)}`,
+            score: r.score,
+          });
+          setActivity(getUserActivity(sessionEmail));
+        }
       })();
     }, 2000);
   };
@@ -177,7 +213,12 @@ function RegridApp() {
     setTimeout(() => {
       const beforeCenter = shape.center;
       const beforeConflicts = result?.conflicts ?? null;
-      const { center, result: newResult } = findOptimalRelocation(shape, enabledLayers, layersRef.current, { maxOffsetDeg: LOCAL_RELOCATE_MAX_OFFSET_DEG });
+      const { center, result: newResult } = findOptimalRelocation(
+        shape,
+        enabledLayers,
+        layersRef.current,
+        { maxOffsetDeg: LOCAL_RELOCATE_MAX_OFFSET_DEG },
+      );
       flyToRef.current(center, 9.2);
       setTimeout(() => {
         setShape(buildShape(shape.kind, center, shape.radiusMeters, `shape-${Date.now()}`));
@@ -186,21 +227,42 @@ function RegridApp() {
         setShapePulse(true);
         if (pulseTimerRef.current) window.clearTimeout(pulseTimerRef.current);
         pulseTimerRef.current = window.setTimeout(() => setShapePulse(false), 2600);
-        setCompare({ beforeScore: prevScoreRef.current, afterScore: newResult.score, movedKm: distanceMeters(beforeCenter, center) / 1000, headline: summarizeAvoided(beforeConflicts, newResult.conflicts) });
+        setCompare({
+          beforeScore: prevScoreRef.current,
+          afterScore: newResult.score,
+          movedKm: distanceMeters(beforeCenter, center) / 1000,
+          headline: summarizeAvoided(beforeConflicts, newResult.conflicts),
+        });
         if (ghostTimerRef.current) window.clearTimeout(ghostTimerRef.current);
         ghostTimerRef.current = window.setTimeout(() => setGhostShape(null), 6500);
+        if (sessionEmail) {
+          addUserActivity(sessionEmail, {
+            type: "optimize",
+            text: `Optimized site by ${(distanceMeters(beforeCenter, center) / 1000).toFixed(1)} km`,
+            score: newResult.score,
+          });
+          setActivity(getUserActivity(sessionEmail));
+        }
       }, 900);
     }, 1600);
   };
 
   const handleClear = () => {
-    setCopilotAnswer(null); setShape(null); setGhostShape(null); setShapePulse(false);
-    setResult(null); setAnalysisState("idle"); setHighlightedConflict(null);
-    setRelocateSuccess(false); relocateArmedRef.current = false; prevScoreRef.current = null;
+    setCopilotAnswer(null);
+    setShape(null);
+    setGhostShape(null);
+    setShapePulse(false);
+    setResult(null);
+    setAnalysisState("idle");
+    setHighlightedConflict(null);
+    setRelocateSuccess(false);
+    relocateArmedRef.current = false;
+    prevScoreRef.current = null;
     setCompare({ beforeScore: null, afterScore: null, movedKm: null, headline: null });
     if (ghostTimerRef.current) window.clearTimeout(ghostTimerRef.current);
     if (pulseTimerRef.current) window.clearTimeout(pulseTimerRef.current);
-    ghostTimerRef.current = null; pulseTimerRef.current = null;
+    ghostTimerRef.current = null;
+    pulseTimerRef.current = null;
   };
 
   useEffect(() => {
@@ -209,10 +271,19 @@ function RegridApp() {
       setLayers((prev) => {
         const seen = new Set(prev.map((l) => l.id));
         const merged = [...prev];
-        for (const e of extra) { if (!seen.has(e.id)) { merged.push(e); seen.add(e.id); } }
+        for (const e of extra) {
+          if (!seen.has(e.id)) {
+            merged.push(e);
+            seen.add(e.id);
+          }
+        }
         return merged;
       });
-      setEnabledLayers((prev) => { const next = new Set(prev); for (const l of extra) next.add(l.id); return next; });
+      setEnabledLayers((prev) => {
+        const next = new Set(prev);
+        for (const l of extra) next.add(l.id);
+        return next;
+      });
     });
   }, []);
 
@@ -229,8 +300,26 @@ function RegridApp() {
     relocateArmedRef.current = false;
   }, [analysisState, result]);
 
+  if (!sessionEmail) {
+    return (
+      <UserAuthGate
+        onAuthenticated={(email) => {
+          setSessionEmail(email);
+          setActivity(getUserActivity(email));
+        }}
+      />
+    );
+  }
+
   if (!token) {
-    return <TokenGate onSubmit={(t) => { localStorage.setItem(TOKEN_KEY, t); setToken(t); }} />;
+    return (
+      <TokenGate
+        onSubmit={(t) => {
+          localStorage.setItem(TOKEN_KEY, t);
+          setToken(t);
+        }}
+      />
+    );
   }
 
   return (
@@ -239,12 +328,18 @@ function RegridApp() {
       <div className="relative min-h-0 min-w-0 flex-1">
         <div className="absolute inset-0 z-0">
           <MapCanvas
-            token={token} layers={layers} enabledLayers={enabledLayers}
-            shape={shape} ghostShape={ghostShape} shapePulse={shapePulse}
+            token={token}
+            layers={layers}
+            enabledLayers={enabledLayers}
+            shape={shape}
+            ghostShape={ghostShape}
+            shapePulse={shapePulse}
             highlightedConflict={highlightedConflict}
             crosshair={!!activeTool && !copilotRunning}
             onMapClick={handleMapClick}
-            onMapReady={(fly) => { flyToRef.current = fly; }}
+            onMapReady={(fly) => {
+              flyToRef.current = fly;
+            }}
           />
         </div>
 
@@ -263,31 +358,75 @@ function RegridApp() {
         ) : null}
 
         <LeftOperationsRail
-          layers={layers} enabledLayers={enabledLayers} onToggleLayer={handleToggleLayer}
-          projectKind={projectKind} onProjectKindChange={setProjectKind}
-          acreage={acreage} onAcreageChange={setAcreage}
-          activeTool={activeTool} onSelectTool={setActiveTool}
-          hasShape={!!shape} onAnalyze={handleAnalyze} onFindBetterSite={handleRelocate}
-          onClear={handleClear} analysisState={analysisState} copilotRunning={copilotRunning}
+          layers={layers}
+          enabledLayers={enabledLayers}
+          onToggleLayer={handleToggleLayer}
+          projectKind={projectKind}
+          onProjectKindChange={setProjectKind}
+          acreage={acreage}
+          onAcreageChange={setAcreage}
+          activeTool={activeTool}
+          onSelectTool={setActiveTool}
+          hasShape={!!shape}
+          onAnalyze={handleAnalyze}
+          onFindBetterSite={handleRelocate}
+          onClear={handleClear}
+          analysisState={analysisState}
+          copilotRunning={copilotRunning}
         />
 
         <RiskScoreHUD
-          hasShape={!!shape} analysisState={analysisState} result={result}
-          copilotAnswer={copilotAnswer} onHoverConflict={setHighlightedConflict}
-          relocateSuccess={relocateSuccess} compare={compare}
+          hasShape={!!shape}
+          analysisState={analysisState}
+          result={result}
+          copilotAnswer={copilotAnswer}
+          onHoverConflict={setHighlightedConflict}
+          relocateSuccess={relocateSuccess}
+          compare={compare}
           onApplySuggestion={handleRelocate}
-          canApplySuggestion={!!shape && analysisState === "result" && !!result && result.score >= 28 && result.conflicts.length > 0}
+          canApplySuggestion={
+            !!shape &&
+            analysisState === "result" &&
+            !!result &&
+            result.score >= 28 &&
+            result.conflicts.length > 0
+          }
+        />
+        <UserDashboard
+          email={sessionEmail}
+          activity={activity}
+          onLogout={() => {
+            logoutUser();
+            setSessionEmail(null);
+            setActivity([]);
+          }}
         />
       </div>
 
       <SpatialCopilot
-        allLayers={layers} enabledLayers={enabledLayers} mapboxToken={token}
-        onApplyEnabledLayers={setEnabledLayers} shapeKind={activeTool ?? "circle"}
-        flyTo={(c, z) => flyToRef.current(c, z)} statusLine={copilotStatusLine}
-        onCopilotRunningChange={setCopilotRunning} onCopilotAnswer={setCopilotAnswer}
+        allLayers={layers}
+        enabledLayers={enabledLayers}
+        mapboxToken={token}
+        onApplyEnabledLayers={setEnabledLayers}
+        shapeKind={activeTool ?? "circle"}
+        flyTo={(c, z) => flyToRef.current(c, z)}
+        statusLine={copilotStatusLine}
+        onCopilotRunningChange={setCopilotRunning}
+        onCopilotAnswer={setCopilotAnswer}
+        onCommandSubmitted={(command) => {
+          if (!sessionEmail) return;
+          addUserActivity(sessionEmail, { type: "search", text: command });
+          setActivity(getUserActivity(sessionEmail));
+        }}
         showAnswerInRiskPanel={!!copilotAnswer}
-        onApplyShape={(next) => { setShape(next); setHighlightedConflict(null); }}
-        onApplyAnalysis={(next) => { setResult(next); setAnalysisState(next ? "result" : "idle"); }}
+        onApplyShape={(next) => {
+          setShape(next);
+          setHighlightedConflict(null);
+        }}
+        onApplyAnalysis={(next) => {
+          setResult(next);
+          setAnalysisState(next ? "result" : "idle");
+        }}
       />
     </div>
   );

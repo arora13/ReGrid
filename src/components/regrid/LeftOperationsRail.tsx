@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { LayerDef, LayerId, ProjectKind, ShapeKind } from "@/lib/regrid/types";
-import { Circle, Hand, Hexagon, Ruler, Square, Trash2, Upload } from "lucide-react";
+import { Circle, Hand, Hexagon, Square, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 
@@ -24,46 +24,13 @@ interface LeftOperationsRailProps {
   copilotRunning: boolean;
 }
 
-const SHAPE_TOOLS: { kind: ShapeKind; label: string; icon: ReactNode }[] = [
-  { kind: "circle", label: "Circle site", icon: <Circle strokeWidth={1.4} className="h-4 w-4" /> },
-  { kind: "square", label: "Square site", icon: <Square strokeWidth={1.4} className="h-4 w-4" /> },
-  { kind: "hexagon", label: "Hex site", icon: <Hexagon strokeWidth={1.4} className="h-4 w-4" /> },
-];
+const PANEL = "rounded-xl border border-white/[0.09] bg-[#060e1c]/90 backdrop-blur-xl shadow-xl";
 
-function IconBtn({
-  active,
-  disabled,
-  title,
-  onClick,
-  children,
-  danger,
-}: {
-  active?: boolean;
-  disabled?: boolean;
-  title: string;
-  onClick?: () => void;
-  children: ReactNode;
-  danger?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      disabled={disabled}
-      onClick={onClick}
-      className={[
-        "flex h-9 w-9 items-center justify-center rounded-lg transition duration-150 disabled:cursor-not-allowed disabled:opacity-30",
-        active
-          ? "bg-white/12 text-white"
-          : danger
-            ? "text-white/25 hover:bg-rose-500/12 hover:text-rose-300"
-            : "text-white/28 hover:bg-white/8 hover:text-white/70",
-      ].join(" ")}
-    >
-      {children}
-    </button>
-  );
-}
+const SHAPE_TOOLS: { kind: ShapeKind; label: string; icon: ReactNode }[] = [
+  { kind: "circle",  label: "Circle",  icon: <Circle  className="h-[15px] w-[15px]" strokeWidth={1.5} /> },
+  { kind: "square",  label: "Square",  icon: <Square  className="h-[15px] w-[15px]" strokeWidth={1.5} /> },
+  { kind: "hexagon", label: "Hexagon", icon: <Hexagon className="h-[15px] w-[15px]" strokeWidth={1.5} /> },
+];
 
 export function LeftOperationsRail({
   layers,
@@ -85,70 +52,71 @@ export function LeftOperationsRail({
   const busy = analysisState === "analyzing" || analysisState === "relocating" || copilotRunning;
 
   const missions = useMemo(
-    () =>
-      [
-        { id: "solar" as const, label: "Solar" },
-        { id: "battery" as const, label: "Battery" },
-        { id: "grid-tied" as const, label: "Grid-tied" },
-      ] as const,
+    () => [
+      { id: "solar"    as const, label: "Solar"    },
+      { id: "battery"  as const, label: "Battery"  },
+      { id: "grid-tied"as const, label: "Grid-tied"},
+    ] as const,
     [],
   );
 
   return (
     <>
-      {/* ── Left gradient fade ─────────────────────────────── */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-56 bg-gradient-to-r from-black/50 via-black/15 to-transparent" />
-
-      {/* ── Tool icon rail ─────────────────────────────────── */}
+      {/* ── Tool rail ──────────────────────────────────────────── */}
       <motion.div
-        initial={{ opacity: 0, x: -8 }}
+        initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-        className="pointer-events-auto absolute left-4 top-1/2 z-20 -translate-y-1/2 flex flex-col gap-0.5"
+        transition={{ duration: 0.3 }}
+        className={`pointer-events-auto absolute left-3 top-3 z-20 flex flex-col gap-0.5 p-1.5 ${PANEL}`}
       >
-        <IconBtn title="Pan map" active={activeTool === null} onClick={() => onSelectTool(null)}>
-          <Hand strokeWidth={1.4} className="h-4 w-4" />
-        </IconBtn>
+        {/* Pan */}
+        <ToolBtn
+          active={activeTool === null}
+          title="Pan map"
+          onClick={() => onSelectTool(null)}
+        >
+          <Hand className="h-[15px] w-[15px]" strokeWidth={1.5} />
+        </ToolBtn>
 
         {SHAPE_TOOLS.map((t) => (
-          <IconBtn
+          <ToolBtn
             key={t.kind}
-            title={t.label}
             active={activeTool === t.kind}
             disabled={busy}
+            title={t.label}
             onClick={() => onSelectTool(t.kind)}
           >
             {t.icon}
-          </IconBtn>
+          </ToolBtn>
         ))}
 
-        <IconBtn title={`Site size · ${acreage} ac`} disabled={busy}>
-          <Ruler strokeWidth={1.4} className="h-4 w-4" />
-        </IconBtn>
+        <div className="my-0.5 h-px bg-white/[0.07]" />
 
-        <div className="my-1 h-px bg-white/[0.07]" />
-
-        <IconBtn title="Import dataset" disabled={busy}>
-          <Upload strokeWidth={1.4} className="h-4 w-4" />
-        </IconBtn>
-
-        <IconBtn title="Clear footprint" danger disabled={!hasShape || busy} onClick={onClear}>
-          <Trash2 strokeWidth={1.4} className="h-3.5 w-3.5" />
-        </IconBtn>
+        {/* Clear */}
+        <button
+          type="button"
+          title="Clear site"
+          disabled={!hasShape || busy}
+          onClick={onClear}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition hover:bg-rose-500/15 hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-25"
+        >
+          <Trash2 className="h-[14px] w-[14px]" strokeWidth={1.5} />
+        </button>
       </motion.div>
 
-      {/* ── Site config (floating, left of tools) ─────────── */}
+      {/* ── Site config panel ──────────────────────────────────── */}
       <motion.div
-        initial={{ opacity: 0, x: -8 }}
+        initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut", delay: 0.06 }}
-        className="pointer-events-auto absolute left-16 top-4 z-20 w-[200px]"
+        transition={{ duration: 0.3, delay: 0.05 }}
+        className={`pointer-events-auto absolute left-[3.25rem] top-3 z-20 w-[220px] p-3 ${PANEL}`}
       >
-        {/* Project kind */}
-        <p className="map-text font-mono text-[9px] tracking-[0.28em] text-white/22 uppercase">
-          Site
+        <p className="mb-2 font-mono text-[9px] tracking-[0.25em] text-white/30 uppercase">
+          Site type
         </p>
-        <div className="mt-2 flex gap-1.5">
+
+        {/* Project kind tabs */}
+        <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5">
           {missions.map((m) => (
             <button
               key={m.id}
@@ -156,10 +124,10 @@ export function LeftOperationsRail({
               disabled={busy}
               onClick={() => onProjectKindChange(m.id)}
               className={[
-                "rounded px-2.5 py-1 text-[11px] font-medium transition duration-150 disabled:opacity-40",
+                "flex-1 rounded-md py-1 text-[11px] font-medium transition duration-150 disabled:opacity-40",
                 projectKind === m.id
-                  ? "bg-white/12 text-white"
-                  : "text-white/28 hover:bg-white/6 hover:text-white/60",
+                  ? "bg-white/12 text-white shadow-sm"
+                  : "text-white/35 hover:text-white/65",
               ].join(" ")}
             >
               {m.label}
@@ -169,10 +137,8 @@ export function LeftOperationsRail({
 
         {/* Acreage */}
         <div className="mt-3 flex items-center justify-between">
-          <span className="map-text text-[11px] text-white/28">Size</span>
-          <span className="map-text font-mono text-[11px] tabular-nums text-white/40">
-            {acreage} ac
-          </span>
+          <span className="text-[11px] text-white/40">Site size</span>
+          <span className="font-mono text-[11px] tabular-nums text-white/60">{acreage} ac</span>
         </div>
         <input
           type="range"
@@ -182,75 +148,114 @@ export function LeftOperationsRail({
           value={acreage}
           disabled={busy}
           onChange={(e) => onAcreageChange(Number(e.target.value))}
-          className="mt-1 w-full accent-white/60 opacity-40 hover:opacity-70 disabled:opacity-20"
+          className="mt-1.5 w-full cursor-pointer accent-white disabled:opacity-30"
         />
 
-        {/* Actions */}
-        <div className="mt-3 flex gap-2">
+        {/* Action buttons */}
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={onAnalyze}
             disabled={!hasShape || busy}
-            className="map-text rounded px-3 py-1.5 text-[11px] font-semibold text-white/70 ring-1 ring-white/15 transition hover:bg-white/8 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+            className="rounded-lg bg-white/10 py-2 text-[11px] font-semibold text-white/80 transition hover:bg-white/18 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
           >
-            {analysisState === "analyzing" ? "Scoring…" : "Run analysis"}
+            {analysisState === "analyzing" ? "Scoring…" : "Analyze"}
           </button>
           <button
             type="button"
             onClick={onFindBetterSite}
             disabled={!hasShape || busy}
-            className="map-text rounded px-3 py-1.5 text-[11px] font-medium text-white/35 transition hover:text-white/65 disabled:cursor-not-allowed disabled:opacity-30"
+            className="rounded-lg border border-white/[0.09] py-2 text-[11px] font-medium text-white/45 transition hover:border-white/18 hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-30"
           >
             {analysisState === "relocating" ? "Searching…" : "Optimize"}
           </button>
         </div>
+
+        {!hasShape && (
+          <p className="mt-2.5 text-center text-[10px] text-white/20">
+            Click the map to place a site
+          </p>
+        )}
       </motion.div>
 
-      {/* ── Layer list (bottom-left, floating) ─────────────── */}
+      {/* ── Layer panel — positioned above the copilot bar ─────── */}
+      {/* bottom-[90px] clears the ~80px copilot bar + buffer       */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
-        className="pointer-events-auto absolute bottom-4 left-4 z-20"
+        transition={{ duration: 0.3, delay: 0.1 }}
+        className={`pointer-events-auto absolute bottom-[90px] left-3 z-20 w-[220px] p-3 ${PANEL}`}
       >
-        <p className="map-text font-mono text-[9px] tracking-[0.28em] text-white/22 uppercase">
+        <p className="mb-2.5 font-mono text-[9px] tracking-[0.25em] text-white/30 uppercase">
           Layers
         </p>
-        <ul className="mt-2 max-h-[32vh] space-y-1.5 overflow-y-auto">
+        <ul className="max-h-[26vh] space-y-0.5 overflow-y-auto">
           {layers.map((layer) => {
             const on = enabledLayers.has(layer.id);
             return (
               <li key={layer.id}>
-                <label className="flex cursor-pointer items-center gap-2.5 group">
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    onChange={() => onToggleLayer(layer.id)}
-                    className="sr-only"
-                  />
-                  {/* Dot indicator */}
+                <button
+                  type="button"
+                  onClick={() => onToggleLayer(layer.id)}
+                  className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left transition hover:bg-white/[0.04]"
+                >
+                  {/* Color swatch / checkbox */}
                   <span
-                    className="h-[7px] w-[7px] shrink-0 rounded-full transition duration-200"
+                    className="flex h-4 w-4 shrink-0 items-center justify-center rounded border transition duration-150"
                     style={{
                       backgroundColor: on ? layer.color : "transparent",
-                      border: `1px solid ${on ? layer.color : "rgba(255,255,255,0.15)"}`,
-                      boxShadow: on ? `0 0 6px ${layer.color}88` : undefined,
+                      borderColor: on ? layer.color : "rgba(255,255,255,0.18)",
+                      boxShadow: on ? `0 0 6px ${layer.color}55` : undefined,
                     }}
-                  />
-                  <span
-                    className={[
-                      "map-text truncate text-[11.5px] font-light transition duration-150",
-                      on ? "text-white/55" : "text-white/18",
-                    ].join(" ")}
                   >
+                    {on && (
+                      <svg viewBox="0 0 10 10" className="h-2.5 w-2.5" fill="none">
+                        <path d="M2 5l2 2.5 4-4" stroke="#000" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className={`truncate text-[11.5px] transition duration-150 ${on ? "text-white/65" : "text-white/25"}`}>
                     {layer.name}
                   </span>
-                </label>
+                </button>
               </li>
             );
           })}
         </ul>
       </motion.div>
     </>
+  );
+}
+
+// ── Tool button ──────────────────────────────────────────────────────────────
+function ToolBtn({
+  active,
+  disabled,
+  title,
+  onClick,
+  children,
+}: {
+  active?: boolean;
+  disabled?: boolean;
+  title: string;
+  onClick?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+      className={[
+        "flex h-8 w-8 items-center justify-center rounded-lg transition duration-150",
+        "disabled:cursor-not-allowed disabled:opacity-30",
+        active
+          ? "bg-white text-[#06101e] shadow-[0_0_10px_rgba(255,255,255,0.15)]"
+          : "text-white/45 hover:bg-white/10 hover:text-white",
+      ].join(" ")}
+    >
+      {children}
+    </button>
   );
 }

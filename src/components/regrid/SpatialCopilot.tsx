@@ -27,6 +27,7 @@ interface SpatialCopilotProps {
   onApplyAnalysis: (result: AnalysisResult | null) => void;
   onCopilotRunningChange?: (running: boolean) => void;
   onCopilotAnswer?: (summary: string | null) => void;
+  onCommandSubmitted?: (command: string) => void;
   showAnswerInRiskPanel?: boolean;
   statusLine?: string;
 }
@@ -42,6 +43,7 @@ export function SpatialCopilot({
   onApplyAnalysis,
   onCopilotRunningChange,
   onCopilotAnswer,
+  onCommandSubmitted,
 }: SpatialCopilotProps) {
   const [traceOpen, setTraceOpen] = useState(false);
   const [command, setCommand] = useState("");
@@ -53,8 +55,12 @@ export function SpatialCopilot({
   const lastAnthropicAttemptRef = useRef(0);
   const ANTHROPIC_CLIENT_COOLDOWN_MS = 3200;
 
-  useEffect(() => { onCopilotRunningChange?.(running); }, [running, onCopilotRunningChange]);
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [log, traceOpen]);
+  useEffect(() => {
+    onCopilotRunningChange?.(running);
+  }, [running, onCopilotRunningChange]);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [log, traceOpen]);
 
   const canRun = useMemo(() => command.trim().length > 0 && !running, [command, running]);
   const append = (line: string) => setLog((prev) => [...prev.slice(-200), line]);
@@ -69,36 +75,103 @@ export function SpatialCopilot({
     append("run · start");
     try {
       const trimmed = command.trim();
+      onCommandSubmitted?.(trimmed);
       let summary: string;
       try {
         const now = Date.now();
         if (now - lastAnthropicAttemptRef.current < ANTHROPIC_CLIENT_COOLDOWN_MS) {
           append("client · llm_cooldown · fallback_regex");
-          summary = await runSpatialCopilotDemo({ command: trimmed, enabledLayers, allLayers, shapeKind, signal: ac.signal, handlers: { onLog: append, onFly: flyTo, onShape: onApplyShape, onAnalysis: onApplyAnalysis } });
+          summary = await runSpatialCopilotDemo({
+            command: trimmed,
+            enabledLayers,
+            allLayers,
+            shapeKind,
+            signal: ac.signal,
+            handlers: {
+              onLog: append,
+              onFly: flyTo,
+              onShape: onApplyShape,
+              onAnalysis: onApplyAnalysis,
+            },
+          });
         } else {
           lastAnthropicAttemptRef.current = now;
-          const intentRes = await parseCopilotIntentFn({ data: { command: trimmed }, signal: ac.signal });
+          const intentRes = await parseCopilotIntentFn({
+            data: { command: trimmed },
+            signal: ac.signal,
+          });
           if (intentRes.ok) {
-            const nextEnabled = enabledSetFromIntentFocus(intentRes.intent, allLayers, enabledLayers);
+            const nextEnabled = enabledSetFromIntentFocus(
+              intentRes.intent,
+              allLayers,
+              enabledLayers,
+            );
             onApplyEnabledLayers?.(nextEnabled);
             append("llm · intent_ok");
-            summary = await runStructuredSpatialCopilot({ command: trimmed, intent: intentRes.intent, enabledLayersForRun: nextEnabled, allLayers, shapeKind, mapboxToken, signal: ac.signal, handlers: { onLog: append, onFly: flyTo, onShape: onApplyShape, onAnalysis: onApplyAnalysis } });
+            summary = await runStructuredSpatialCopilot({
+              command: trimmed,
+              intent: intentRes.intent,
+              enabledLayersForRun: nextEnabled,
+              allLayers,
+              shapeKind,
+              mapboxToken,
+              signal: ac.signal,
+              handlers: {
+                onLog: append,
+                onFly: flyTo,
+                onShape: onApplyShape,
+                onAnalysis: onApplyAnalysis,
+              },
+            });
           } else {
-            const extra = intentRes.code === "rate_limited" && intentRes.retryAfterSec ? ` (retry ~${intentRes.retryAfterSec}s)` : "";
+            const extra =
+              intentRes.code === "rate_limited" && intentRes.retryAfterSec
+                ? ` (retry ~${intentRes.retryAfterSec}s)`
+                : "";
             append(`llm · ${intentRes.code}${extra} · fallback_regex`);
-            summary = await runSpatialCopilotDemo({ command: trimmed, enabledLayers, allLayers, shapeKind, signal: ac.signal, handlers: { onLog: append, onFly: flyTo, onShape: onApplyShape, onAnalysis: onApplyAnalysis } });
+            summary = await runSpatialCopilotDemo({
+              command: trimmed,
+              enabledLayers,
+              allLayers,
+              shapeKind,
+              signal: ac.signal,
+              handlers: {
+                onLog: append,
+                onFly: flyTo,
+                onShape: onApplyShape,
+                onAnalysis: onApplyAnalysis,
+              },
+            });
           }
         }
       } catch {
         append("llm · request_failed · fallback_regex");
-        summary = await runSpatialCopilotDemo({ command: trimmed, enabledLayers, allLayers, shapeKind, signal: ac.signal, handlers: { onLog: append, onFly: flyTo, onShape: onApplyShape, onAnalysis: onApplyAnalysis } });
+        summary = await runSpatialCopilotDemo({
+          command: trimmed,
+          enabledLayers,
+          allLayers,
+          shapeKind,
+          signal: ac.signal,
+          handlers: {
+            onLog: append,
+            onFly: flyTo,
+            onShape: onApplyShape,
+            onAnalysis: onApplyAnalysis,
+          },
+        });
       }
       append("run · complete");
       onCopilotAnswer?.(summary);
     } catch (e) {
       const err = e as { name?: string };
-      if (err?.name === "AbortError") { append("run · aborted"); onCopilotAnswer?.(null); }
-      else { append("run · error"); console.error(e); onCopilotAnswer?.("Copilot crashed — try a shorter prompt."); }
+      if (err?.name === "AbortError") {
+        append("run · aborted");
+        onCopilotAnswer?.(null);
+      } else {
+        append("run · error");
+        console.error(e);
+        onCopilotAnswer?.("Copilot crashed — try a shorter prompt.");
+      }
     } finally {
       setRunning(false);
     }
@@ -110,7 +183,6 @@ export function SpatialCopilot({
       <div className="pointer-events-none h-28 bg-gradient-to-t from-black/75 to-transparent" />
 
       <div className="pointer-events-auto border-t border-white/[0.12] bg-[#060f1c]/96 backdrop-blur-2xl">
-
         {/* ── Top row: label + quick prompts ─────────────────── */}
         <div className="flex items-center gap-3 border-b border-white/[0.07] px-5 py-2.5">
           <div className="flex shrink-0 items-center gap-1.5">
@@ -128,7 +200,10 @@ export function SpatialCopilot({
               <button
                 key={text}
                 type="button"
-                onClick={() => { setCommand(text); inputRef.current?.focus(); }}
+                onClick={() => {
+                  setCommand(text);
+                  inputRef.current?.focus();
+                }}
                 className="shrink-0 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[11px] whitespace-nowrap text-white/38 transition duration-150 hover:border-white/18 hover:bg-white/[0.07] hover:text-white/70"
               >
                 {text.length > 30 ? text.slice(0, 28) + "…" : text}
@@ -142,14 +217,18 @@ export function SpatialCopilot({
             onClick={() => setTraceOpen((v) => !v)}
             className="hidden shrink-0 items-center gap-1 text-[10px] text-white/20 transition hover:text-white/45 sm:flex"
           >
-            Trace {traceOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            Trace{" "}
+            {traceOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </button>
         </div>
 
         {/* ── Main input ───────────────────────────────────────── */}
         <form
           className="flex items-center gap-3 px-5 py-3"
-          onSubmit={(e) => { e.preventDefault(); void handleRun(); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleRun();
+          }}
         >
           {/* Animated status dot */}
           <span className="relative flex h-[7px] w-[7px] shrink-0">
@@ -168,7 +247,11 @@ export function SpatialCopilot({
             value={command}
             onChange={(e) => setCommand(e.target.value)}
             disabled={running}
-            placeholder={running ? "AI copilot thinking…" : "Describe a siting goal or ask a question — e.g. lowest-risk solar near Fresno, 80 acres"}
+            placeholder={
+              running
+                ? "AI copilot thinking…"
+                : "Describe a siting goal or ask a question — e.g. lowest-risk solar near Fresno, 80 acres"
+            }
             className="min-w-0 flex-1 bg-transparent text-[13.5px] text-white/85 placeholder:text-white/28 focus:outline-none disabled:opacity-60"
           />
 
@@ -198,7 +281,9 @@ export function SpatialCopilot({
               className="overflow-hidden border-t border-white/[0.06]"
             >
               <div className="max-h-24 overflow-y-auto px-5 py-2.5 font-mono text-[10px] leading-relaxed text-white/22">
-                {log.map((line, idx) => <div key={`${idx}-${line}`}>{line}</div>)}
+                {log.map((line, idx) => (
+                  <div key={`${idx}-${line}`}>{line}</div>
+                ))}
                 <div ref={endRef} />
               </div>
             </motion.div>
