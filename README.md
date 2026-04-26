@@ -158,4 +158,4 @@ Open the app. If `VITE_MAPBOX_TOKEN` is set in `.env.local`, the map loads immed
 
 ## BroncoHacks 2026
 
-This project was made for **BroncoHacks 2026**.
+This project was made for **BroncoHacks 2026** — weekend sprint energy.
