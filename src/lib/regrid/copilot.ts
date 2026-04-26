@@ -4,6 +4,7 @@ import { buildShape, distanceMeters } from "./geo";
 import { analyzeShape, findOptimalRelocation } from "./analyze";
 import { clampLngLatToCalifornia } from "./california";
 import { matchCaliforniaPlaceHint } from "./californiaPlaces";
+import { reverseGeocode } from "./mapbox-geocode";
 
 /** In-state seed only; prompts outside CA vocabulary still land in California. */
 export type CaliforniaSubregion = "norcal" | "socal" | "central" | null;
@@ -269,6 +270,8 @@ export function buildCopilotUserAnswer(
   result: AnalysisResult,
   acres: number,
   reloc?: { km: number; compass: string; anchorScore: number } | null,
+  specificPlace?: string | null,
+  finalCenter?: [number, number] | null,
 ): string {
   const ac = Math.round(acres);
 
@@ -283,11 +286,22 @@ export function buildCopilotUserAnswer(
           ? "Northern California"
           : "California";
 
-  // Location string (includes direction if the AI moved the site)
-  const locationStr =
+  // Coordinates string for pinpoint reference
+  const coordStr = finalCenter
+    ? `${Math.abs(finalCenter[1]).toFixed(4)}°${finalCenter[1] >= 0 ? "N" : "S"}, ${Math.abs(finalCenter[0]).toFixed(4)}°${finalCenter[0] >= 0 ? "E" : "W"}`
+    : null;
+
+  // Location string — prefer real reverse-geocoded name over generic city+direction
+  const dirStr =
     reloc && reloc.km >= 1.5
       ? `${reloc.km.toFixed(1)} km ${reloc.compass} of ${placeTitle}`
       : `near ${placeTitle}`;
+
+  const locationStr = specificPlace
+    ? `${specificPlace}${coordStr ? ` (${coordStr})` : ""} — ${dirStr}`
+    : coordStr
+      ? `${dirStr} (${coordStr})`
+      : dirStr;
 
   // Score tier label
   const tier =
@@ -359,10 +373,12 @@ export async function runSpatialCopilotFromParsed(args: {
   enabledLayers: Set<LayerId>;
   allLayers: LayerDef[];
   shapeKind: ShapeKind;
+  mapboxToken?: string;
   signal?: AbortSignal;
   handlers: CopilotRunHandlers;
 }): Promise<string> {
   const { parsed, enabledLayers: userEnabled, allLayers, shapeKind, signal, handlers } = args;
+  const mapboxToken = args.mapboxToken;
   const { onLog, onFly, onShape, onAnalysis } = handlers;
 
   const maxRisk = parsed.maxRisk ?? 25;
@@ -409,7 +425,7 @@ export async function runSpatialCopilotFromParsed(args: {
     return { km, compass: compass8(parsed.placeMatch.center, finalCenter), anchorScore };
   };
 
-  const finishRun = (finalResult: AnalysisResult, referenceFinalCenter: [number, number], anchorScore: number): string => {
+  const finishRun = async (finalResult: AnalysisResult, referenceFinalCenter: [number, number], anchorScore: number): Promise<string> => {
     if (windMentioned(parsed) && parsed.placeMatch) {
       const { meta, result: r } = applyWindPlaceNearestMockDemo({
         parsed,
@@ -424,7 +440,11 @@ export async function runSpatialCopilotFromParsed(args: {
       });
       return buildWindPlaceUserAnswer(parsed, r, acres, meta);
     }
-    return buildCopilotUserAnswer(parsed, finalResult, acres, makeReloc(referenceFinalCenter, anchorScore));
+    // Reverse geocode the final center to give a specific named location
+    const specificPlace = mapboxToken
+      ? await reverseGeocode(referenceFinalCenter, mapboxToken, signal).catch(() => null)
+      : null;
+    return buildCopilotUserAnswer(parsed, finalResult, acres, makeReloc(referenceFinalCenter, anchorScore), specificPlace, referenceFinalCenter);
   };
 
   onLog("tool · calculate_site_risk { footprint, active_layers }");
@@ -450,7 +470,7 @@ export async function runSpatialCopilotFromParsed(args: {
     onLog("decision · seed_within_budget");
     await delay(220, signal);
     onLog("action · publish_candidate");
-    return finishRun(result, center, seedScore);
+    return await finishRun(result, center, seedScore);
   }
 
   const worst = result.conflicts.find((c) => c.severity === "high") ?? result.conflicts[0];
@@ -482,7 +502,7 @@ export async function runSpatialCopilotFromParsed(args: {
     onLog("decision · post_adjustment_within_budget");
     await delay(220, signal);
     onLog("action · publish_candidate");
-    return finishRun(result, center, seedScore);
+    return await finishRun(result, center, seedScore);
   }
 
   // Tight disk for named cities (~15–20 km); wider for generic CA prompts.
@@ -516,7 +536,7 @@ export async function runSpatialCopilotFromParsed(args: {
   onLog("decision · candidate_selected");
   await delay(200, signal);
   onLog("ui · fly_to_candidate + render_footprint");
-  return finishRun(finalResult, center, seedScore);
+  return await finishRun(finalResult, center, seedScore);
 }
 
 export async function runSpatialCopilotDemo(args: {
@@ -524,6 +544,7 @@ export async function runSpatialCopilotDemo(args: {
   enabledLayers: Set<LayerId>;
   allLayers: LayerDef[];
   shapeKind: ShapeKind;
+  mapboxToken?: string;
   signal?: AbortSignal;
   handlers: CopilotRunHandlers;
 }): Promise<string> {

@@ -127,6 +127,7 @@ export async function runStructuredSpatialCopilot(args: {
     enabledLayers: args.enabledLayersForRun,
     allLayers: args.allLayers,
     shapeKind,
+    mapboxToken: args.mapboxToken,
     signal: args.signal,
     handlers: args.handlers,
   });

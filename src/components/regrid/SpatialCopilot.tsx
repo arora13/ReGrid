@@ -86,6 +86,7 @@ export function SpatialCopilot({
             enabledLayers,
             allLayers,
             shapeKind,
+            mapboxToken,
             signal: ac.signal,
             handlers: {
               onLog: append,
@@ -134,6 +135,7 @@ export function SpatialCopilot({
               enabledLayers,
               allLayers,
               shapeKind,
+              mapboxToken,
               signal: ac.signal,
               handlers: {
                 onLog: append,
@@ -151,6 +153,7 @@ export function SpatialCopilot({
           enabledLayers,
           allLayers,
           shapeKind,
+          mapboxToken,
           signal: ac.signal,
           handlers: {
             onLog: append,
