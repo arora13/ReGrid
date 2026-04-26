@@ -21,10 +21,8 @@ import { getPublicMapboxTokenFromEnv } from "@/lib/regrid/env";
 import {
   addUserActivity,
   getSessionEmail,
-  getUserActivity,
   logoutUser,
   type UserActivity,
-  // getUserActivity used in UserDashboard directly
 } from "@/lib/regrid/user-store";
 import type {
   AnalysisResult,
