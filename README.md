@@ -109,7 +109,7 @@ To graduate from demo simulation to production-grade spatial intelligence, these
 - EPA EJScreen polygons
 
 ### 5) Optional Production Enhancements
-- Caching layer (Redis/Valkey) for repeated spatial queries
+- Caching layer (Redis/Valkey) — optional for repeated spatial queries
 - Queue/workers for heavy geoprocessing jobs
 - Object storage for versioned GeoJSON snapshots
 - Observability (Sentry + logs + traces)
