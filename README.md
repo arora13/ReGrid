@@ -49,9 +49,9 @@ flowchart TB
 
 Each project footprint is represented as GeoJSON and rendered with a semi-transparent fill and dashed border on the map. The app supports:
 
-- **Circle** - regular polygon approximation
-- **Square** - 4-sided polygon with rotation to align edges
-- **Hexagon** - 6-sided polygon
+- **Circle** — regular polygon approximation
+- **Square** — 4-sided polygon with rotation to align edges
+- **Hexagon** — 6-sided polygon
 
 Generalized regular-polygon generation:
 
