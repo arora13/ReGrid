@@ -134,7 +134,7 @@ npm install
 npm run dev
 ```
 
-## Backend + PostGIS (new)
+## Backend + PostGIS
 
 The repo now includes a backend scaffold at `backend/` with FastAPI + PostGIS.
 
