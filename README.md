@@ -25,7 +25,7 @@ flowchart LR
     FE --> CE[Conflict Engine\nClient-side simulation]
     FE --> MAP[Mapbox APIs]
     CP --> CE
-    CE --> LAYERS[Mock Federal GeoJSON Layers]
+    CE --> LAYERS[Mock federal GeoJSON layers]
     CE --> SCORE[Risk Score + Conflict List]
     SCORE --> UI[Risk Panel + Recommendations]
 ```
