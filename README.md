@@ -150,7 +150,7 @@ Then try:
 - `GET http://localhost:8000/health`
 - `POST http://localhost:8000/api/conflict-check` (see `backend/README.md`)
 
-Open the app. If `VITE_MAPBOX_TOKEN` is set in `.env.local`, the map loads immediately; otherwise paste a token in the gate, then:
+Run the dev server and open the app. If `VITE_MAPBOX_TOKEN` is set in `.env.local`, the map loads immediately; otherwise paste a token in the gate, then:
 - Toggle layers in the left operations rail (collapsible section)
 - Place a shape on map click
 - Analyze risk
