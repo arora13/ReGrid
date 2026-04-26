@@ -2,9 +2,9 @@ import { motion } from "framer-motion";
 import type { ProjectKind } from "@/lib/regrid/types";
 
 export const WORKSPACE_PROJECT_LABEL: Record<ProjectKind, string> = {
-  solar: "Vineyard Wind / proposal 04-C",
-  battery: "Grid-scale storage / proposal 02-B",
-  "grid-tied": "Central Valley solar / proposal 07-A",
+  solar: "Solar siting workspace",
+  battery: "Battery siting workspace",
+  "grid-tied": "Grid-tied siting workspace",
 };
 
 export function workspaceProjectLabel(kind: ProjectKind): string {

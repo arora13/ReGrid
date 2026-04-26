@@ -6,7 +6,6 @@ import { SpatialCopilot } from "@/components/regrid/SpatialCopilot";
 import { LeftOperationsRail } from "@/components/regrid/LeftOperationsRail";
 import { RiskScoreHUD } from "@/components/regrid/RiskScoreHUD";
 import { WorkspaceHeader, workspaceProjectLabel } from "@/components/regrid/WorkspaceHeader";
-import { UserAuthGate } from "@/components/regrid/UserAuthGate";
 import { UserDashboard } from "@/components/regrid/UserDashboard";
 import { LAYERS } from "@/lib/regrid/layers";
 import { loadManifestLayers } from "@/lib/regrid/datasets";
@@ -379,17 +378,6 @@ function RegridApp() {
     relocateArmedRef.current = false;
   }, [analysisState, result]);
 
-  if (!sessionEmail) {
-    return (
-      <UserAuthGate
-        onAuthenticated={(email) => {
-          setSessionEmail(email);
-          setActivity(getUserActivity(email));
-        }}
-      />
-    );
-  }
-
   if (!token) {
     return (
       <TokenGate
@@ -471,15 +459,17 @@ function RegridApp() {
             result.conflicts.length > 0
           }
         />
-        <UserDashboard
-          email={sessionEmail}
-          activity={activity}
-          onLogout={() => {
-            logoutUser();
-            setSessionEmail(null);
-            setActivity([]);
-          }}
-        />
+        {sessionEmail ? (
+          <UserDashboard
+            email={sessionEmail}
+            activity={activity}
+            onLogout={() => {
+              logoutUser();
+              setSessionEmail(null);
+              setActivity([]);
+            }}
+          />
+        ) : null}
       </div>
 
       <SpatialCopilot
