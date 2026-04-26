@@ -161,4 +161,5 @@ Run the dev server and open the app. If `VITE_MAPBOX_TOKEN` is set in `.env.loca
 
 ## BroncoHacks 2026
 
+
 This project was made for **BroncoHacks 2026** — weekend sprint energy.
