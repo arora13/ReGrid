@@ -130,6 +130,7 @@ VITE_SPATIAL_API_URL=http://localhost:8000
 ## Local Development
 
 ```bash
+# from repo root
 npm install
 npm run dev
 ```
