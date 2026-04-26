@@ -144,7 +144,7 @@ Quick start:
 docker compose -f docker-compose.backend.yml up --build
 ```
 
-Then:
+Then try:
 - `GET http://localhost:8000/health`
 - `POST http://localhost:8000/api/conflict-check` (see `backend/README.md`)
 
