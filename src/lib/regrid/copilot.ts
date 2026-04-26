@@ -139,24 +139,6 @@ function summarizeConflicts(result: AnalysisResult): string {
     .join(" · ");
 }
 
-function whereDescription(parsed: ParsedCopilotCommand): string {
-  if (parsed.placeMatch) return `near ${parsed.placeMatch.label.replace(/_/g, " ")}`;
-  switch (parsed.caSubregion) {
-    case "norcal":
-      return "Northern California demo area";
-    case "socal":
-      return "Southern California demo area";
-    case "central":
-      return "Central Valley demo area";
-    default: {
-      const lc = parsed.raw.toLowerCase();
-      if (/\bcalifornia\b|\bcalif\.?\b/.test(lc)) {
-        return "California — statewide anchor (add a city, e.g. Pomona or Fresno, to lock the map tighter)";
-      }
-      return "California (statewide demo anchor)";
-    }
-  }
-}
 
 export function windMentioned(parsed: ParsedCopilotCommand): boolean {
   if (/\bsolar\b/i.test(parsed.raw)) return false;
@@ -248,7 +230,7 @@ export function applyWindPlaceNearestMockDemo(args: {
 }
 
 export function buildWindPlaceUserAnswer(
-  parsed: ParsedCopilotCommand,
+  _parsed: ParsedCopilotCommand,
   result: AnalysisResult,
   acres: number,
   meta: WindPlaceNearestMockMeta,
@@ -286,31 +268,81 @@ export function buildCopilotUserAnswer(
   parsed: ParsedCopilotCommand,
   result: AnalysisResult,
   acres: number,
+  reloc?: { km: number; compass: string; anchorScore: number } | null,
 ): string {
-  const isWind = windMentioned(parsed);
-  const where = whereDescription(parsed);
   const ac = Math.round(acres);
-  const placement = `Demo footprint ~${ac} ac (${where}).`;
 
-  const scorePart =
-    result.conflicts.length === 0
-      ? `On the layers that are on, the siting score is ${result.score}/100 with no overlaps (mock geometry only).`
-      : `On the layers that are on, the siting score is ${result.score}/100. Top drivers: ${result.conflicts
-          .slice(0, 2)
-          .map((c) => c.label)
-          .join("; ")}.`;
+  // Human-readable place name
+  const placeTitle = parsed.placeMatch
+    ? parsed.placeMatch.label.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    : parsed.caSubregion === "central"
+      ? "Central Valley"
+      : parsed.caSubregion === "socal"
+        ? "Southern California"
+        : parsed.caSubregion === "norcal"
+          ? "Northern California"
+          : "California";
 
-  if (isWind) {
-    return (
-      `Direct answer: there is no valid "lowest wind-risk site" result in this build — wind turbines, wakes, and wind resource are not modeled, so ranking wind risk would be meaningless. ` +
-      `${placement} What we did instead is score only mock transmission, wildfire, and equity shapes: ${scorePart} ` +
-      `That number is not a wind study; it is a rough spatial sketch on demo data.`
-    )
-      .replace(/\s+/g, " ")
-      .trim();
-  }
+  // Location string (includes direction if the AI moved the site)
+  const locationStr =
+    reloc && reloc.km >= 1.5
+      ? `${reloc.km.toFixed(1)} km ${reloc.compass} of ${placeTitle}`
+      : `near ${placeTitle}`;
 
-  return `Direct answer: ${placement} ${scorePart} Not a permit decision — demo data only.`
+  // Score tier label
+  const tier =
+    result.score <= 20
+      ? "very low"
+      : result.score <= 35
+        ? "low"
+        : result.score <= 55
+          ? "moderate"
+          : result.score <= 75
+            ? "high"
+            : "very high";
+
+  // Improvement note when relocation reduced the score
+  const improvement =
+    reloc && reloc.anchorScore - result.score >= 4
+      ? ` — improved from ${reloc.anchorScore} at the city-center anchor`
+      : "";
+
+  // Conflict summary
+  const topConflicts = result.conflicts.slice(0, 3);
+  const conflictStr =
+    topConflicts.length === 0
+      ? "no spatial conflicts detected on the active layers"
+      : topConflicts
+          .map((c) => {
+            const label = c.label
+              .toLowerCase()
+              .replace(/\s+overlap$/i, "")
+              .replace(/\s+nearby.*$/i, "");
+            const detail = c.detail.split("—")[0]?.trim() ?? c.detail.slice(0, 45);
+            return `${label} (${detail})`;
+          })
+          .join("; ");
+
+  // Which datasets were actually checked
+  const checkedLayers: string[] = [];
+  if (parsed.wantsWildfire) checkedLayers.push("wildfire risk zones");
+  if (parsed.wantsTransmission) checkedLayers.push("transmission corridors");
+  if (parsed.wantsEJ) checkedLayers.push("equity tracts");
+  if (parsed.wantsGrid) checkedLayers.push("grid infrastructure");
+  if (checkedLayers.length === 0)
+    checkedLayers.push("wildfire risk zones", "transmission corridors", "equity tracts");
+  const layerStr = checkedLayers.join(", ");
+
+  // Wind-specific note (only when wind power resource was implied)
+  const windNote = windMentioned(parsed)
+    ? " Note: wind turbine resource and wake modelling is not included — this score covers spatial conflicts only."
+    : "";
+
+  return (
+    `Best candidate ${locationStr}, ${ac} ac — risk score ${result.score}/100 (${tier})${improvement}. ` +
+    `Checked ${layerStr}: ${conflictStr}.${windNote} ` +
+    `Run full analysis to add real-time fault-zone and critical-habitat screening from federal ArcGIS services.`
+  )
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -350,7 +382,6 @@ export async function runSpatialCopilotFromParsed(args: {
       parsed.wantsTransmission ? "transmission " : ""
     }${parsed.wantsWildfire ? "wildfire " : ""}${parsed.wantsEJ ? "equity " : ""}${parsed.wantsGrid ? "grid " : ""}`.trim(),
   );
-  const cmdLc = parsed.raw.toLowerCase();
   if (windMentioned(parsed)) {
     onLog(
       "notice · wind_generation_not_modeled · spatial_score_is_mock_transmission_wildfire_equity_only",
@@ -370,7 +401,15 @@ export async function runSpatialCopilotFromParsed(args: {
     for (const id of defaultEnabledLayers(parsed)) enabled.add(id);
   }
 
-  const finishRun = (finalResult: AnalysisResult): string => {
+  // Captures distance + direction from the city anchor to wherever the AI finally lands.
+  type RelocInfo = { km: number; compass: string; anchorScore: number };
+  const makeReloc = (finalCenter: [number, number], anchorScore: number): RelocInfo | null => {
+    if (!parsed.placeMatch) return null;
+    const km = distanceMeters(parsed.placeMatch.center, finalCenter) / 1000;
+    return { km, compass: compass8(parsed.placeMatch.center, finalCenter), anchorScore };
+  };
+
+  const finishRun = (finalResult: AnalysisResult, referenceFinalCenter: [number, number], anchorScore: number): string => {
     if (windMentioned(parsed) && parsed.placeMatch) {
       const { meta, result: r } = applyWindPlaceNearestMockDemo({
         parsed,
@@ -385,7 +424,7 @@ export async function runSpatialCopilotFromParsed(args: {
       });
       return buildWindPlaceUserAnswer(parsed, r, acres, meta);
     }
-    return buildCopilotUserAnswer(parsed, finalResult, acres);
+    return buildCopilotUserAnswer(parsed, finalResult, acres, makeReloc(referenceFinalCenter, anchorScore));
   };
 
   onLog("tool · calculate_site_risk { footprint, active_layers }");
@@ -404,18 +443,18 @@ export async function runSpatialCopilotFromParsed(args: {
   };
 
   let { shape, result } = runEvaluate("evaluate #1 (seed)");
+  const seedScore = result.score; // anchor score for relocation delta
   await delay(320, signal);
 
   if (result.score <= maxRisk) {
     onLog("decision · seed_within_budget");
     await delay(220, signal);
     onLog("action · publish_candidate");
-    return finishRun(result);
+    return finishRun(result, center, seedScore);
   }
 
   const worst = result.conflicts.find((c) => c.severity === "high") ?? result.conflicts[0];
   if (worst?.layerId === "usda-wildfire") {
-    // Large nudges break "near {city}" intent; stay tight when a place anchor matched.
     const shift = parsed.placeMatch ? 0.022 : 0.12;
     onLog(
       parsed.placeMatch
@@ -443,7 +482,7 @@ export async function runSpatialCopilotFromParsed(args: {
     onLog("decision · post_adjustment_within_budget");
     await delay(220, signal);
     onLog("action · publish_candidate");
-    return finishRun(result);
+    return finishRun(result, center, seedScore);
   }
 
   // Tight disk for named cities (~15–20 km); wider for generic CA prompts.
@@ -477,7 +516,7 @@ export async function runSpatialCopilotFromParsed(args: {
   onLog("decision · candidate_selected");
   await delay(200, signal);
   onLog("ui · fly_to_candidate + render_footprint");
-  return finishRun(finalResult);
+  return finishRun(finalResult, center, seedScore);
 }
 
 export async function runSpatialCopilotDemo(args: {

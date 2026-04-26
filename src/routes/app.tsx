@@ -159,6 +159,8 @@ function RegridApp() {
   const ghostTimerRef = useRef<number | null>(null);
   const pulseTimerRef = useRef<number | null>(null);
   const flyToRef = useRef<(c: [number, number], z?: number) => void>(() => {});
+  // Tracks the last shape placed by the copilot so we can augment with real federal data
+  const copilotShapeRef = useRef<DrawnShape | null>(null);
   const [layers, setLayers] = useState<LayerDef[]>(() => [...LAYERS]);
   const layersRef = useRef(layers);
   layersRef.current = layers;
@@ -489,12 +491,27 @@ function RegridApp() {
         }}
         showAnswerInRiskPanel={!!copilotAnswer}
         onApplyShape={(next) => {
+          copilotShapeRef.current = next;
           setShape(next);
           setHighlightedConflict(null);
         }}
         onApplyAnalysis={(next) => {
           setResult(next);
           setAnalysisState(next ? "result" : "idle");
+          // Augment the copilot result with real federal ArcGIS data
+          const placed = copilotShapeRef.current;
+          if (!next || !placed) return;
+          void (async () => {
+            try {
+              const poly = placed.geojson.geometry;
+              if (poly.type !== "Polygon" || !poly.coordinates[0]?.length) return;
+              const ring = poly.coordinates[0].map(([lng, lat]) => [lng, lat]);
+              const snap = await federalScreenFootprintFn({ data: { ring } });
+              setResult((prev) => (prev ? mergeFederalScreenIntoAnalysis(prev, snap) : prev));
+            } catch {
+              // Real screen failed — keep the spatial-layer result as-is
+            }
+          })();
         }}
       />
     </div>
