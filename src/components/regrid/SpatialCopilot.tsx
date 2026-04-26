@@ -7,14 +7,14 @@ import {
   runStructuredSpatialCopilot,
 } from "@/lib/regrid/copilot-structured";
 import { parseCopilotIntentFn } from "@/lib/regrid/parseCopilotIntent";
-import { ChevronDown, ChevronUp, Send, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 
 const COPILOT_TUTORIAL_DISMISS_KEY = "regrid:copilot-tutorial-dismiss";
 
 const SAMPLE_PROMPTS: { label: string; text: string }[] = [
   { label: "Wind + city", text: "Lowest wind risk near Pomona" },
   { label: "City + acres", text: "80 acres lowest risk near Fresno" },
-  { label: "Solar + region", text: "Lowest risk solar site in Central Valley, CA, risk under 35" },
+  { label: "Solar + region", text: "Lowest risk solar in Central Valley, risk under 35" },
   { label: "Statewide", text: "Lowest risk site in California, 50 acres" },
 ];
 
@@ -29,7 +29,7 @@ interface SpatialCopilotProps {
   onApplyAnalysis: (result: AnalysisResult | null) => void;
   onCopilotRunningChange?: (running: boolean) => void;
   onCopilotAnswer?: (summary: string | null) => void;
-  showAnswerInRiskPanel?: boolean;
+  showAnswerInRiskPanel?: boolean; // kept for API compat, answer shown in RiskScoreHUD
   statusLine?: string;
 }
 
@@ -44,7 +44,6 @@ export function SpatialCopilot({
   onApplyAnalysis,
   onCopilotRunningChange,
   onCopilotAnswer,
-  showAnswerInRiskPanel = false,
   statusLine = "Describe a siting goal in natural language",
 }: SpatialCopilotProps) {
   const [traceOpen, setTraceOpen] = useState(false);
@@ -60,14 +59,10 @@ export function SpatialCopilot({
   useEffect(() => {
     try {
       if (localStorage.getItem(COPILOT_TUTORIAL_DISMISS_KEY)) setTutorialDismissed(true);
-    } catch {
-      /* private mode */
-    }
+    } catch { /* private mode */ }
   }, []);
 
-  useEffect(() => {
-    onCopilotRunningChange?.(running);
-  }, [running, onCopilotRunningChange]);
+  useEffect(() => { onCopilotRunningChange?.(running); }, [running, onCopilotRunningChange]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
@@ -77,11 +72,7 @@ export function SpatialCopilot({
   const append = (line: string) => setLog((prev) => [...prev.slice(-200), line]);
 
   const dismissTutorial = () => {
-    try {
-      localStorage.setItem(COPILOT_TUTORIAL_DISMISS_KEY, "1");
-    } catch {
-      /* private mode */
-    }
+    try { localStorage.setItem(COPILOT_TUTORIAL_DISMISS_KEY, "1"); } catch { /* private mode */ }
     setTutorialDismissed(true);
   };
 
@@ -101,82 +92,36 @@ export function SpatialCopilot({
         if (now - lastAnthropicAttemptRef.current < ANTHROPIC_CLIENT_COOLDOWN_MS) {
           append("client · llm_cooldown · fallback_regex");
           summary = await runSpatialCopilotDemo({
-            command: trimmed,
-            enabledLayers,
-            allLayers,
-            shapeKind,
-            signal: ac.signal,
-            handlers: {
-              onLog: append,
-              onFly: flyTo,
-              onShape: onApplyShape,
-              onAnalysis: onApplyAnalysis,
-            },
+            command: trimmed, enabledLayers, allLayers, shapeKind, signal: ac.signal,
+            handlers: { onLog: append, onFly: flyTo, onShape: onApplyShape, onAnalysis: onApplyAnalysis },
           });
         } else {
           lastAnthropicAttemptRef.current = now;
-          const intentRes = await parseCopilotIntentFn({
-            data: { command: trimmed },
-            signal: ac.signal,
-          });
+          const intentRes = await parseCopilotIntentFn({ data: { command: trimmed }, signal: ac.signal });
           if (intentRes.ok) {
-            const nextEnabled = enabledSetFromIntentFocus(
-              intentRes.intent,
-              allLayers,
-              enabledLayers,
-            );
+            const nextEnabled = enabledSetFromIntentFocus(intentRes.intent, allLayers, enabledLayers);
             onApplyEnabledLayers?.(nextEnabled);
             append("llm · intent_ok");
             summary = await runStructuredSpatialCopilot({
-              command: trimmed,
-              intent: intentRes.intent,
-              enabledLayersForRun: nextEnabled,
-              allLayers,
-              shapeKind,
-              mapboxToken,
-              signal: ac.signal,
-              handlers: {
-                onLog: append,
-                onFly: flyTo,
-                onShape: onApplyShape,
-                onAnalysis: onApplyAnalysis,
-              },
+              command: trimmed, intent: intentRes.intent, enabledLayersForRun: nextEnabled,
+              allLayers, shapeKind, mapboxToken, signal: ac.signal,
+              handlers: { onLog: append, onFly: flyTo, onShape: onApplyShape, onAnalysis: onApplyAnalysis },
             });
           } else {
-            const extra =
-              intentRes.code === "rate_limited" && intentRes.retryAfterSec
-                ? ` (retry ~${intentRes.retryAfterSec}s)`
-                : "";
+            const extra = intentRes.code === "rate_limited" && intentRes.retryAfterSec
+              ? ` (retry ~${intentRes.retryAfterSec}s)` : "";
             append(`llm · ${intentRes.code}${extra} · fallback_regex`);
             summary = await runSpatialCopilotDemo({
-              command: trimmed,
-              enabledLayers,
-              allLayers,
-              shapeKind,
-              signal: ac.signal,
-              handlers: {
-                onLog: append,
-                onFly: flyTo,
-                onShape: onApplyShape,
-                onAnalysis: onApplyAnalysis,
-              },
+              command: trimmed, enabledLayers, allLayers, shapeKind, signal: ac.signal,
+              handlers: { onLog: append, onFly: flyTo, onShape: onApplyShape, onAnalysis: onApplyAnalysis },
             });
           }
         }
       } catch {
         append("llm · request_failed · fallback_regex");
         summary = await runSpatialCopilotDemo({
-          command: trimmed,
-          enabledLayers,
-          allLayers,
-          shapeKind,
-          signal: ac.signal,
-          handlers: {
-            onLog: append,
-            onFly: flyTo,
-            onShape: onApplyShape,
-            onAnalysis: onApplyAnalysis,
-          },
+          command: trimmed, enabledLayers, allLayers, shapeKind, signal: ac.signal,
+          handlers: { onLog: append, onFly: flyTo, onShape: onApplyShape, onAnalysis: onApplyAnalysis },
         });
       }
       append("run · complete");
@@ -189,9 +134,7 @@ export function SpatialCopilot({
       } else {
         append("run · error");
         console.error(e);
-        onCopilotAnswer?.(
-          "Direct answer: the copilot crashed before finishing. Open Trace for details, or try a shorter prompt.",
-        );
+        onCopilotAnswer?.("Copilot crashed — try a shorter prompt.");
       }
     } finally {
       setRunning(false);
@@ -199,131 +142,98 @@ export function SpatialCopilot({
   };
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-4 pb-4 pt-8 sm:px-6">
-      <div className="pointer-events-auto mx-auto max-w-4xl">
-        {/* ── Getting started tutorial ─────────────────────────── */}
-        {!tutorialDismissed ? (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-3 rounded-2xl border border-sky-400/15 bg-[#070d18]/95 px-4 py-3.5 shadow-xl backdrop-blur-xl"
-          >
-            {/* Top accent */}
-            <div className="absolute inset-x-0 top-0 h-px rounded-t-2xl bg-gradient-to-r from-transparent via-sky-400/30 to-transparent" />
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30">
+      {/* Bottom gradient fade */}
+      <div className="pointer-events-none h-20 bg-gradient-to-t from-black/60 to-transparent" />
 
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 shrink-0 text-sky-400" strokeWidth={1.8} />
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-300/90">
-                  Getting started
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={dismissTutorial}
-                className="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium text-slate-500 transition hover:bg-white/[0.05] hover:text-slate-300"
-              >
-                Dismiss
-              </button>
-            </div>
-
-            <ol className="mt-2.5 list-decimal space-y-1 pl-4 text-[11.5px] leading-relaxed text-slate-400">
-              <li>Draw a site using the tools on the left, or type a goal below and press Send.</li>
-              <li>Toggle layers on/off — scores only use checked layers (demo geometry).</li>
-              <li>
-                Open{" "}
-                <span className="font-medium text-slate-200">Siting score</span> (top right) for
-                the plain-English copilot reply.
-              </li>
-            </ol>
-
-            <p className="mt-3 text-[10.5px] font-medium text-slate-600">
-              Try a sample prompt:
-            </p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {SAMPLE_PROMPTS.map((s) => (
+      <div className="pointer-events-auto border-t border-white/[0.14] bg-[#06101e]/92 backdrop-blur-xl">
+        {/* ── Sample prompts (shown until dismissed) ─────────── */}
+        <AnimatePresence>
+          {!tutorialDismissed && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="overflow-hidden border-b border-white/[0.06]"
+            >
+              <div className="flex items-center gap-3 px-6 py-2.5">
+                <span className="map-text font-mono text-[9px] tracking-[0.25em] text-white/20 uppercase">
+                  Try
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {SAMPLE_PROMPTS.map((s) => (
+                    <button
+                      key={s.label}
+                      type="button"
+                      onClick={() => setCommand(s.text)}
+                      className="map-text rounded px-2.5 py-1 text-[11px] text-white/30 ring-1 ring-white/[0.08] transition hover:bg-white/5 hover:text-white/60"
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
                 <button
-                  key={s.label}
                   type="button"
-                  onClick={() => setCommand(s.text)}
-                  className="rounded-full border border-white/[0.09] bg-white/[0.04] px-3 py-1.5 text-left text-[11px] font-medium text-slate-300 transition hover:border-sky-400/25 hover:bg-sky-500/9 hover:text-sky-200"
+                  onClick={dismissTutorial}
+                  className="ml-auto shrink-0 text-[10px] text-white/18 transition hover:text-white/40"
                 >
-                  {s.label}
+                  ✕
                 </button>
-              ))}
-            </div>
-          </motion.div>
-        ) : null}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ── Status line ──────────────────────────────────────── */}
-        <div className="mb-2 flex items-center gap-2.5 px-2">
-          <span className="relative flex h-[7px] w-[7px] shrink-0">
+        <div className="flex items-center gap-2.5 px-6 py-2">
+          <span className="relative flex h-[5px] w-[5px] shrink-0">
             {running && (
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-70" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/50 opacity-70" />
             )}
             <span
-              className={`relative inline-flex h-[7px] w-[7px] rounded-full transition duration-300 ${
-                running ? "bg-cyan-400" : "bg-cyan-400/35"
+              className={`relative inline-flex h-[5px] w-[5px] rounded-full transition duration-300 ${
+                running ? "bg-white/60" : "bg-white/18"
               }`}
             />
           </span>
-          <p className="text-[11.5px] font-normal text-slate-500">{statusLine}</p>
+          <p className="text-[11px] text-white/45">{statusLine}</p>
         </div>
 
-        {/* Answer hint */}
-        {showAnswerInRiskPanel ? (
-          <p className="mb-2 px-2 text-center text-[10.5px] leading-snug text-slate-600" role="note">
-            Plain-English reply is in{" "}
-            <span className="font-semibold text-slate-400">Siting score</span> (top right).
-          </p>
-        ) : null}
+        {/* ── Input row ────────────────────────────────────────── */}
+        <form
+          className="flex items-center gap-3 border-t border-white/[0.05] px-6 py-3"
+          onSubmit={(e) => { e.preventDefault(); void handleRun(); }}
+        >
+          <input
+            value={command}
+            onChange={(e) => setCommand(e.target.value)}
+            disabled={running}
+            placeholder="Describe a siting goal — e.g. lowest risk near Pomona, 80 acres"
+            className="min-w-0 flex-1 bg-transparent text-[13px] font-light text-white/85 placeholder:text-white/32 focus:outline-none disabled:opacity-50"
+          />
 
-        {/* ── Input pill ───────────────────────────────────────── */}
-        <div className="relative">
-          {/* Running shimmer border */}
-          {running && (
-            <div className="absolute -inset-[1px] rounded-[9999px] bg-gradient-to-r from-cyan-500/40 via-blue-500/30 to-indigo-500/40 opacity-80 blur-[2px]" />
-          )}
-          <form
-            className="regrid-copilot-pill relative flex items-stretch gap-1 border border-white/[0.07] bg-[#080e18]/96 py-1 pl-4 pr-1 backdrop-blur-xl"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleRun();
-            }}
+          <button
+            type="button"
+            onClick={() => setTraceOpen((v) => !v)}
+            className="hidden shrink-0 items-center gap-1 text-[10px] text-white/18 transition hover:text-white/40 sm:flex"
           >
-            <input
-              value={command}
-              onChange={(e) => setCommand(e.target.value)}
-              disabled={running}
-              placeholder="Describe a siting goal — e.g. lowest risk near Pomona, 80 acres"
-              className="min-w-0 flex-1 border-0 bg-transparent py-3 text-[13px] text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-0"
-            />
-            <button
-              type="button"
-              onClick={() => setTraceOpen((v) => !v)}
-              className="hidden shrink-0 items-center gap-1 self-center rounded-full px-3 py-2 text-[11px] font-medium text-slate-600 transition hover:bg-white/[0.05] hover:text-slate-400 sm:flex"
-            >
-              Trace
-              {traceOpen ? (
-                <ChevronUp className="h-3 w-3" />
-              ) : (
-                <ChevronDown className="h-3 w-3" />
-              )}
-            </button>
-            <button
-              type="submit"
-              disabled={!canRun}
-              title="Send"
-              className={`flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-full transition duration-150 ${
-                canRun
-                  ? "bg-gradient-to-br from-cyan-400 to-blue-500 text-[#020e18] shadow-[0_6px_18px_rgba(34,211,238,0.28)] hover:brightness-110"
-                  : "bg-white/[0.06] text-white/25"
-              } disabled:cursor-not-allowed`}
-            >
-              <Send className="h-4 w-4" strokeWidth={2.2} />
-            </button>
-          </form>
-        </div>
+            Trace
+            {traceOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+
+          <button
+            type="submit"
+            disabled={!canRun}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition duration-150 ${
+              canRun
+                ? "bg-white/12 text-white/80 hover:bg-white/18 hover:text-white"
+                : "text-white/15"
+            } disabled:cursor-not-allowed`}
+          >
+            <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
+          </button>
+        </form>
 
         {/* ── Trace log ────────────────────────────────────────── */}
         <AnimatePresence initial={false}>
@@ -332,10 +242,10 @@ export function SpatialCopilot({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="regrid-copilot-pill mt-2 overflow-hidden border border-white/[0.06] bg-[#060b14]/96"
+              transition={{ duration: 0.18 }}
+              className="overflow-hidden border-t border-white/[0.05]"
             >
-              <div className="max-h-28 overflow-y-auto px-4 py-2.5 font-mono text-[10px] leading-relaxed text-slate-600">
+              <div className="max-h-24 overflow-y-auto px-6 py-2.5 font-mono text-[10px] leading-relaxed text-white/20">
                 {log.map((line, idx) => (
                   <div key={`${idx}-${line}`}>{line}</div>
                 ))}

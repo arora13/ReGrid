@@ -1,401 +1,227 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { MapCanvas } from "@/components/regrid/MapCanvas";
-import { TokenGate } from "@/components/regrid/TokenGate";
-import { SpatialCopilot } from "@/components/regrid/SpatialCopilot";
-import { LeftOperationsRail } from "@/components/regrid/LeftOperationsRail";
-import { RiskScoreHUD } from "@/components/regrid/RiskScoreHUD";
-import { WorkspaceHeader, workspaceProjectLabel } from "@/components/regrid/WorkspaceHeader";
-import { LAYERS } from "@/lib/regrid/layers";
-import { loadManifestLayers } from "@/lib/regrid/datasets";
-import { clampLngLatToCalifornia, LOCAL_RELOCATE_MAX_OFFSET_DEG } from "@/lib/regrid/california";
-import { buildShape, distanceMeters } from "@/lib/regrid/geo";
-import { analyzeShape, findOptimalRelocation } from "@/lib/regrid/analyze";
-import {
-  federalScreenFootprintFn,
-  mergeFederalScreenIntoAnalysis,
-} from "@/lib/regrid/real-dataset-screen";
-import { getPublicMapboxTokenFromEnv } from "@/lib/regrid/env";
-import type {
-  AnalysisResult,
-  Conflict,
-  DrawnShape,
-  LayerDef,
-  LayerId,
-  ProjectKind,
-  ShapeKind,
-} from "@/lib/regrid/types";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { motion } from "framer-motion";
+import { ArrowRight, Zap, Shield, Cpu } from "lucide-react";
 
 export const Route = createFileRoute("/")({
-  // Mapbox/WebGL must not run during SSR — avoids blank maps after hydration.
-  ssr: false,
   head: () => ({
     meta: [
       { title: "ReGrid · Spatial Intelligence for Clean Energy Siting" },
       {
         name: "description",
         content:
-          "Enterprise spatial intelligence dashboard for siting clean energy infrastructure while avoiding spatial conflicts with federal datasets.",
-      },
-      { property: "og:title", content: "ReGrid · Spatial Intelligence Platform" },
-      {
-        property: "og:description",
-        content:
-          "Site solar, wind, and battery infrastructure with real-time conflict analysis against federal grid, wildfire, and EJScreen layers.",
+          "Enterprise spatial intelligence for siting solar, wind, and battery projects. Real-time conflict analysis against federal datasets.",
       },
     ],
   }),
-  component: RegridApp,
+  component: LandingPage,
 });
 
-const TOKEN_KEY = "regrid:mapbox-token";
-type AnalysisState = "idle" | "analyzing" | "result" | "relocating";
+const FEATURES = [
+  {
+    icon: Shield,
+    label: "Federal conflict screening",
+    desc: "Real-time analysis against HIFLD transmission, USDA wildfire, and EPA EJScreen layers.",
+  },
+  {
+    icon: Zap,
+    label: "Risk scoring /100",
+    desc: "Weighted composite score across all active datasets — updated instantly as you move the site.",
+  },
+  {
+    icon: Cpu,
+    label: "AI siting optimizer",
+    desc: "Natural-language copilot finds the lowest-risk footprint within your target region automatically.",
+  },
+];
 
-function acresToRadiusMeters(acres: number) {
-  const a = Math.max(1, acres);
-  return Math.sqrt((a * 4046.8564224) / Math.PI);
-}
-
-function summarizeAvoided(before: Conflict[] | null, after: Conflict[] | null): string | null {
-  if (!before?.length) return null;
-  const afterLabels = new Set((after ?? []).map((c) => c.label));
-  const removed = before.find((c) => !afterLabels.has(c.label));
-  if (!removed) return null;
-  if (removed.layerId === "usda-wildfire") return "Wildfire exposure reduced materially.";
-  if (removed.layerId === "epa-ejscreen") return "Equity-priority overlap avoided.";
-  if (removed.layerId === "hifld-transmission" || removed.layerId === "eia-grid") {
-    return "Major grid conflict removed (check corridor proximity).";
-  }
-  if (typeof removed.layerId === "string" && removed.layerId.startsWith("ext:")) {
-    return "Imported dataset conflict reduced — review map highlights.";
-  }
-  return "Top conflict driver changed — review map highlights.";
-}
-
-function RegridApp() {
-  const [token, setToken] = useState<string | null>(null);
-  useEffect(() => {
-    const fromEnv = getPublicMapboxTokenFromEnv();
-    if (fromEnv) {
-      setToken(fromEnv);
-      return;
-    }
-    const saved = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
-    if (saved) setToken(saved);
-  }, []);
-
-  const [enabledLayers, setEnabledLayers] = useState<Set<LayerId>>(
-    () => new Set<LayerId>(LAYERS.map((l) => l.id)),
-  );
-  const [projectKind, setProjectKind] = useState<ProjectKind>("solar");
-  const [acreage, setAcreage] = useState(50);
-  const [activeTool, setActiveTool] = useState<ShapeKind | null>("circle");
-  const [shape, setShape] = useState<DrawnShape | null>(null);
-  const [ghostShape, setGhostShape] = useState<DrawnShape | null>(null);
-  const [shapePulse, setShapePulse] = useState(false);
-  const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [highlightedConflict, setHighlightedConflict] = useState<LayerId | null>(null);
-  const [copilotRunning, setCopilotRunning] = useState(false);
-  const [copilotAnswer, setCopilotAnswer] = useState<string | null>(null);
-  const [relocateSuccess, setRelocateSuccess] = useState(false);
-  const [compare, setCompare] = useState<{
-    beforeScore: number | null;
-    afterScore: number | null;
-    movedKm: number | null;
-    headline: string | null;
-  }>({ beforeScore: null, afterScore: null, movedKm: null, headline: null });
-  const prevScoreRef = useRef<number | null>(null);
-  const relocateArmedRef = useRef(false);
-  const ghostTimerRef = useRef<number | null>(null);
-  const pulseTimerRef = useRef<number | null>(null);
-
-  const flyToRef = useRef<(c: [number, number], z?: number) => void>(() => {});
-
-  const radiusMeters = useMemo(() => acresToRadiusMeters(acreage), [acreage]);
-  const siteAreaKm2Label = useMemo(() => {
-    const km2 = (acreage * 4046.8564224) / 1e6;
-    return km2 < 10 ? km2.toFixed(2) : km2.toFixed(1);
-  }, [acreage]);
-
-  const copilotStatusLine = useMemo(() => {
-    if (copilotRunning) return "Copilot is evaluating your request…";
-    if (analysisState === "analyzing") return "Evaluating protected land overlap";
-    if (analysisState === "relocating") return "Searching for a lower-risk footprint nearby…";
-    if (result && analysisState === "result")
-      return `Siting score ${result.score} / 100 — hover drivers on the right to highlight layers`;
-    if (shape) return "Ready to run analysis or describe a new goal below";
-    return "Describe a siting goal — e.g. lowest-risk solar site in Central Valley, CA";
-  }, [copilotRunning, analysisState, result, shape]);
-
-  const handleMapClick = (lngLat: [number, number]) => {
-    if (copilotRunning) return;
-    if (!activeTool) return;
-    setCopilotAnswer(null);
-    const id = `shape-${Date.now()}`;
-    const next = buildShape(activeTool, clampLngLatToCalifornia(lngLat), radiusMeters, id);
-    setShape(next);
-    setGhostShape(null);
-    setShapePulse(true);
-    if (pulseTimerRef.current) window.clearTimeout(pulseTimerRef.current);
-    pulseTimerRef.current = window.setTimeout(() => setShapePulse(false), 2400);
-    setResult(null);
-    setAnalysisState("idle");
-    setCompare({ beforeScore: null, afterScore: null, movedKm: null, headline: null });
-    flyToRef.current(clampLngLatToCalifornia(lngLat), Math.max(8.4, 8.4));
-  };
-
-  const handleToggleLayer = (id: LayerId) => {
-    setEnabledLayers((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    // If a result exists, mark it stale by clearing
-    if (result) setResult(null);
-    if (analysisState === "result") setAnalysisState("idle");
-  };
-
-  const handleAnalyze = () => {
-    if (!shape) return;
-    setCopilotAnswer(null);
-    setAnalysisState("analyzing");
-    setResult(null);
-    setTimeout(() => {
-      void (async () => {
-        let r = analyzeShape(shape, enabledLayers, layersRef.current);
-        try {
-          const poly = shape.geojson.geometry;
-          if (poly.type === "Polygon" && poly.coordinates[0]?.length) {
-            const ring = poly.coordinates[0].map(([lng, lat]) => [lng, lat]);
-            const snap = await federalScreenFootprintFn({ data: { ring } });
-            r = mergeFederalScreenIntoAnalysis(r, snap);
-          }
-        } catch {
-          /* keep mock-only result if federal screening fails */
-        }
-        setResult(r);
-        setAnalysisState("result");
-      })();
-    }, 2000);
-  };
-
-  const handleRelocate = () => {
-    if (!shape) return;
-    setCopilotAnswer(null);
-    setAnalysisState("relocating");
-    setHighlightedConflict(null);
-    relocateArmedRef.current = true;
-    prevScoreRef.current = result?.score ?? null;
-    setRelocateSuccess(false);
-    setGhostShape(shape);
-    setTimeout(() => {
-      const beforeCenter = shape.center;
-      const beforeConflicts = result?.conflicts ?? null;
-      const { center, result: newResult } = findOptimalRelocation(
-        shape,
-        enabledLayers,
-        layersRef.current,
-        {
-          maxOffsetDeg: LOCAL_RELOCATE_MAX_OFFSET_DEG,
-        },
-      );
-      flyToRef.current(center, 9.2);
-      setTimeout(() => {
-        const newShape = buildShape(shape.kind, center, shape.radiusMeters, `shape-${Date.now()}`);
-        setShape(newShape);
-        setResult(newResult);
-        setAnalysisState("result");
-        setShapePulse(true);
-        if (pulseTimerRef.current) window.clearTimeout(pulseTimerRef.current);
-        pulseTimerRef.current = window.setTimeout(() => setShapePulse(false), 2600);
-
-        const movedKm = distanceMeters(beforeCenter, center) / 1000;
-        const headline = summarizeAvoided(beforeConflicts, newResult.conflicts);
-        setCompare({
-          beforeScore: prevScoreRef.current,
-          afterScore: newResult.score,
-          movedKm,
-          headline,
-        });
-
-        if (ghostTimerRef.current) window.clearTimeout(ghostTimerRef.current);
-        ghostTimerRef.current = window.setTimeout(() => setGhostShape(null), 6500);
-      }, 900);
-    }, 1600);
-  };
-
-  const handleClear = () => {
-    setCopilotAnswer(null);
-    setShape(null);
-    setGhostShape(null);
-    setShapePulse(false);
-    setResult(null);
-    setAnalysisState("idle");
-    setHighlightedConflict(null);
-    setRelocateSuccess(false);
-    relocateArmedRef.current = false;
-    prevScoreRef.current = null;
-    setCompare({ beforeScore: null, afterScore: null, movedKm: null, headline: null });
-    if (ghostTimerRef.current) window.clearTimeout(ghostTimerRef.current);
-    if (pulseTimerRef.current) window.clearTimeout(pulseTimerRef.current);
-    ghostTimerRef.current = null;
-    pulseTimerRef.current = null;
-  };
-
-  const [layers, setLayers] = useState<LayerDef[]>(() => [...LAYERS]);
-  const layersRef = useRef(layers);
-  layersRef.current = layers;
-
-  useEffect(() => {
-    void loadManifestLayers().then((extra) => {
-      if (!extra.length) return;
-      setLayers((prev) => {
-        const seen = new Set(prev.map((l) => l.id));
-        const merged = [...prev];
-        for (const e of extra) {
-          if (!seen.has(e.id)) {
-            merged.push(e);
-            seen.add(e.id);
-          }
-        }
-        return merged;
-      });
-      setEnabledLayers((prev) => {
-        const next = new Set(prev);
-        for (const l of extra) next.add(l.id);
-        return next;
-      });
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!relocateArmedRef.current) return;
-    if (analysisState !== "result" || !result) return;
-    const before = prevScoreRef.current;
-    const after = result.score;
-    if (before !== null && after < before) {
-      setRelocateSuccess(true);
-      const t = window.setTimeout(() => setRelocateSuccess(false), 5200);
-      relocateArmedRef.current = false;
-      return () => window.clearTimeout(t);
-    }
-    relocateArmedRef.current = false;
-    return;
-  }, [analysisState, result]);
-
-  if (!token) {
-    return (
-      <TokenGate
-        onSubmit={(t) => {
-          localStorage.setItem(TOKEN_KEY, t);
-          setToken(t);
-        }}
-      />
-    );
-  }
-
+function LandingPage() {
   return (
-    <div className="regrid-workspace fixed inset-0 z-0 flex flex-col overflow-hidden bg-[#0a0e14] ring-1 ring-inset ring-white/[0.06]">
-      <WorkspaceHeader projectKind={projectKind} />
-      <div className="relative min-h-0 min-w-0 flex-1">
-        <div className="absolute inset-0 z-0 min-h-0 min-w-0">
-          <MapCanvas
-            token={token}
-            layers={layers}
-            enabledLayers={enabledLayers}
-            shape={shape}
-            ghostShape={ghostShape}
-            shapePulse={shapePulse}
-            highlightedConflict={highlightedConflict}
-            crosshair={!!activeTool && !copilotRunning}
-            onMapClick={handleMapClick}
-            onMapReady={(fly) => {
-              flyToRef.current = fly;
-            }}
-          />
-        </div>
-
-        {shape ? (
-          <div className="pointer-events-none absolute left-1/2 top-[36%] z-[15] w-[min(92vw,320px)] -translate-x-1/2 -translate-y-full">
-            <div className="rounded-md border border-[#60a5fa]/30 bg-[#0d1117]/95 px-3 py-2 text-left shadow-xl backdrop-blur-xl">
-              <p className="text-[11px] font-semibold tracking-wide text-[#f1f5f9]">
-                SITE · {workspaceProjectLabel(projectKind)}
-              </p>
-              <p className="mt-0.5 text-[10px] leading-snug text-[#94a3b8]">
-                {siteAreaKm2Label} km² · {shape.kind} · {(shape.radiusMeters / 1000).toFixed(1)} km
-              </p>
-            </div>
-          </div>
-        ) : null}
-
-        <LeftOperationsRail
-          layers={layers}
-          enabledLayers={enabledLayers}
-          onToggleLayer={handleToggleLayer}
-          projectKind={projectKind}
-          onProjectKindChange={setProjectKind}
-          acreage={acreage}
-          onAcreageChange={setAcreage}
-          activeTool={activeTool}
-          onSelectTool={setActiveTool}
-          hasShape={!!shape}
-          onAnalyze={handleAnalyze}
-          onFindBetterSite={handleRelocate}
-          onClear={handleClear}
-          analysisState={analysisState}
-          copilotRunning={copilotRunning}
+    <div className="relative min-h-screen overflow-x-hidden bg-[#04080e] text-white">
+      {/* ── Ambient background glows ────────────────────────── */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -left-40 top-0 h-[700px] w-[700px] rounded-full bg-cyan-500/[0.05] blur-[120px]" />
+        <div className="absolute -right-40 top-1/3 h-[600px] w-[600px] rounded-full bg-indigo-500/[0.04] blur-[120px]" />
+        <div className="absolute bottom-0 left-1/2 h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-blue-500/[0.04] blur-[100px]" />
+        {/* Subtle grid */}
+        <div
+          className="absolute inset-0 opacity-[0.022]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(103,232,249,1) 1px, transparent 1px), linear-gradient(90deg, rgba(103,232,249,1) 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
+          }}
         />
-
-        <RiskScoreHUD
-          hasShape={!!shape}
-          analysisState={analysisState}
-          result={result}
-          copilotAnswer={copilotAnswer}
-          onHoverConflict={setHighlightedConflict}
-          relocateSuccess={relocateSuccess}
-          compare={compare}
-          onApplySuggestion={handleRelocate}
-          canApplySuggestion={
-            !!shape &&
-            analysisState === "result" &&
-            !!result &&
-            result.score >= 28 &&
-            result.conflicts.length > 0
-          }
-        />
-
-        {import.meta.env.DEV ? (
-          <div
-            className="pointer-events-none absolute bottom-3 right-3 z-[80] max-w-[min(100vw-1rem,280px)] rounded-md border border-emerald-500/25 bg-black/75 px-2 py-1 font-mono text-[10px] text-emerald-200/90 shadow-sm"
-            title="If this badge never updates after a code change, restart dev with npm run dev:fresh."
-          >
-            REGRID_DEV · shell-20260426b · flex+dock+map-poll
-          </div>
-        ) : null}
       </div>
 
-      <SpatialCopilot
-        allLayers={layers}
-        enabledLayers={enabledLayers}
-        mapboxToken={token}
-        onApplyEnabledLayers={setEnabledLayers}
-        shapeKind={activeTool ?? "circle"}
-        flyTo={(c, z) => flyToRef.current(c, z)}
-        statusLine={copilotStatusLine}
-        onCopilotRunningChange={setCopilotRunning}
-        onCopilotAnswer={setCopilotAnswer}
-        showAnswerInRiskPanel={!!copilotAnswer}
-        onApplyShape={(next) => {
-          setShape(next);
-          setHighlightedConflict(null);
-        }}
-        onApplyAnalysis={(next) => {
-          setResult(next);
-          setAnalysisState(next ? "result" : "idle");
-        }}
-      />
+      {/* ── Nav ─────────────────────────────────────────────── */}
+      <nav className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-10 sm:py-6">
+        <div className="flex items-center gap-2">
+          {/* Logo mark */}
+          <div className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.04]">
+            <svg viewBox="0 0 24 24" className="h-4 w-4 text-white/60" fill="currentColor">
+              <path d="M12 2L3 7v10l9 5 9-5V7l-9-5zm0 2.3L18.5 8 12 11.7 5.5 8 12 4.3zM5 9.7l6 3.45V20l-6-3.33V9.7zm14 7l-6 3.33v-6.85l6-3.45v6.97z" />
+            </svg>
+          </div>
+          <span className="text-[15px] tracking-tight">
+            <span className="font-light italic text-white/40">Re</span>
+            <span className="font-bold text-white">Grid</span>
+          </span>
+        </div>
+
+        <div className="flex items-center gap-6">
+          <span className="hidden text-[12px] font-light text-white/30 sm:block">
+            Clean Energy Siting Intelligence
+          </span>
+          <Link
+            to="/app"
+            className="flex items-center gap-2 rounded-lg border border-white/12 bg-white/[0.05] px-4 py-2 text-[13px] font-medium text-white/70 transition hover:border-white/20 hover:bg-white/[0.09] hover:text-white"
+          >
+            Use the Tool
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </nav>
+
+      {/* ── Hero ─────────────────────────────────────────────── */}
+      <section className="relative z-10 flex min-h-[calc(100vh-80px)] flex-col items-center justify-center px-6 text-center sm:px-10">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="max-w-4xl"
+        >
+          {/* Eyebrow */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1, duration: 0.6 }}
+            className="mb-6 font-mono text-[10px] tracking-[0.35em] text-white/25 uppercase"
+          >
+            Spatial Intelligence Platform · Beta
+          </motion.p>
+
+          {/* Main headline */}
+          <h1 className="font-serif text-[clamp(52px,9vw,110px)] font-normal leading-[0.92] tracking-tight text-white">
+            Site clean
+            <br />
+            <span className="italic text-white/50">energy</span>{" "}
+            <span className="text-white">smarter.</span>
+          </h1>
+
+          {/* Subheadline */}
+          <motion.p
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25, duration: 0.7 }}
+            className="mx-auto mt-8 max-w-xl text-[clamp(15px,2vw,18px)] font-light leading-relaxed text-white/38"
+          >
+            Place solar, wind, and battery projects on the map. Get instant conflict
+            analysis against federal transmission, wildfire, and equity datasets — scored
+            from 0 to 100.
+          </motion.p>
+
+          {/* CTA */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+            className="mt-12 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
+          >
+            <Link
+              to="/app"
+              className="group flex items-center gap-3 rounded-xl border border-white/15 bg-white/[0.07] px-7 py-3.5 text-[15px] font-semibold text-white shadow-[0_0_40px_rgba(255,255,255,0.04)] transition duration-200 hover:border-white/25 hover:bg-white/[0.12] hover:shadow-[0_0_60px_rgba(255,255,255,0.08)]"
+            >
+              Use the Tool
+              <ArrowRight className="h-4 w-4 transition duration-200 group-hover:translate-x-0.5" />
+            </Link>
+            <span className="text-[12px] text-white/18">No account required · runs in your browser</span>
+          </motion.div>
+        </motion.div>
+
+        {/* Scroll hint */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1, duration: 0.8 }}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2"
+        >
+          <div className="flex flex-col items-center gap-2">
+            <span className="font-mono text-[9px] tracking-[0.3em] text-white/18 uppercase">Scroll</span>
+            <div className="h-5 w-px bg-gradient-to-b from-white/20 to-transparent" />
+          </div>
+        </motion.div>
+      </section>
+
+      {/* ── Feature strip ────────────────────────────────────── */}
+      <section className="relative z-10 border-t border-white/[0.06] px-6 py-20 sm:px-10">
+        <div className="mx-auto max-w-5xl">
+          <motion.p
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="mb-14 text-center font-mono text-[10px] tracking-[0.3em] text-white/22 uppercase"
+          >
+            What it does
+          </motion.p>
+
+          <div className="grid gap-10 sm:grid-cols-3">
+            {FEATURES.map((f, i) => (
+              <motion.div
+                key={f.label}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1, duration: 0.55 }}
+                className="flex flex-col gap-4"
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03]">
+                  <f.icon className="h-4 w-4 text-white/40" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <p className="text-[14px] font-semibold text-white/70">{f.label}</p>
+                  <p className="mt-2 text-[13px] font-light leading-relaxed text-white/28">{f.desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Bottom CTA banner ────────────────────────────────── */}
+      <section className="relative z-10 border-t border-white/[0.06] px-6 py-20 text-center sm:px-10">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+        >
+          <p className="font-serif text-[clamp(28px,4vw,48px)] font-normal text-white/70">
+            Ready to find your site?
+          </p>
+          <p className="mt-3 text-[14px] font-light text-white/25">
+            Paste a Mapbox token and start siting in under a minute.
+          </p>
+          <Link
+            to="/app"
+            className="mt-8 inline-flex items-center gap-2.5 rounded-xl border border-white/12 bg-white/[0.05] px-8 py-3.5 text-[14px] font-semibold text-white/70 transition hover:border-white/22 hover:bg-white/[0.1] hover:text-white"
+          >
+            Open the Tool <ArrowRight className="h-4 w-4" />
+          </Link>
+        </motion.div>
+      </section>
+
+      {/* ── Footer ───────────────────────────────────────────── */}
+      <footer className="relative z-10 border-t border-white/[0.05] px-6 py-6 sm:px-10">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] text-white/15">
+            <span className="font-light italic">Re</span>
+            <span className="font-semibold">Grid</span>
+            {" "}· Spatial Intelligence Platform
+          </span>
+          <span className="font-mono text-[10px] text-white/10">Beta</span>
+        </div>
+      </footer>
     </div>
   );
 }

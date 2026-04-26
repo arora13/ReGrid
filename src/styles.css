@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap");
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -35,17 +35,16 @@
   background-size: 48px 48px;
 }
 
-/* Offshore / enterprise siting shell — matches reference palette */
+/* Offshore / enterprise siting shell */
 .regrid-workspace {
-  --regrid-canvas: #0a0e14;
-  --regrid-panel: rgba(13, 17, 23, 0.96);
-  --regrid-risk: #e28a5b;
+  --regrid-canvas: #04080e;
+  --regrid-panel: rgba(4, 8, 14, 0.0);
+  --regrid-risk: #fb923c;
   --regrid-link: #60a5fa;
   --regrid-muted: #94a3b8;
-  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
-  background:
-    radial-gradient(1200px 520px at 10% -10%, rgb(56 189 248 / 0.12), transparent 55%),
-    radial-gradient(900px 460px at 92% 0%, rgb(129 140 248 / 0.1), transparent 56%), #070b12;
+  --font-serif: "DM Serif Display", Georgia, "Times New Roman", serif;
+  font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  background: #04080e;
 }
 
 .regrid-risk-panel-glow {
@@ -187,6 +186,7 @@
   );
 
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "DM Serif Display", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
@@ -230,6 +230,7 @@
   --color-primary-glow: var(--primary-glow);
   --font-sans: var(--font-display);
   --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
 }
 
 @layer base {
@@ -250,6 +251,42 @@
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
   }
+}
+
+/* Editorial floating text — subtle drop shadow so text reads over any map tile */
+.map-text {
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.95), 0 0 30px rgba(0, 0, 0, 0.6);
+}
+.map-text-strong {
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 1),
+    0 2px 12px rgba(0, 0, 0, 0.9),
+    0 0 40px rgba(0, 0, 0, 0.7);
+}
+
+/* Serif display for score numbers */
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+/* Regrid tool icon button states */
+.regrid-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  color: rgba(255, 255, 255, 0.3);
+  transition: color 0.15s, background 0.15s;
+}
+.regrid-tool-btn:hover {
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+}
+.regrid-tool-btn.active {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 @layer utilities {
