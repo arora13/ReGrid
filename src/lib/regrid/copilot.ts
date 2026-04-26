@@ -117,13 +117,18 @@ function pickInitialCenter(parsed: ParsedCopilotCommand): [number, number] {
 }
 
 function defaultEnabledLayers(parsed: ParsedCopilotCommand): Set<LayerId> {
-  // If user mentions specific layers, bias toggles; otherwise keep a strong demo stack.
-  const s = new Set<LayerId>(["hifld-transmission", "usda-wildfire", "epa-ejscreen"]);
-  if (parsed.wantsGrid) s.add("eia-grid");
-  if (parsed.wantsTransmission) s.add("hifld-transmission");
-  if (parsed.wantsWildfire) s.add("usda-wildfire");
-  if (parsed.wantsEJ) s.add("epa-ejscreen");
-  return s;
+  // When user explicitly names a dataset category, focus the search on only those layers.
+  // "lowest wildfire risk" → usda-wildfire only. "lowest risk" → full stack.
+  const specific: LayerId[] = [];
+  if (parsed.wantsWildfire) specific.push("usda-wildfire");
+  if (parsed.wantsTransmission) specific.push("hifld-transmission");
+  if (parsed.wantsEJ) specific.push("epa-ejscreen");
+  if (parsed.wantsGrid) specific.push("eia-grid");
+
+  if (specific.length > 0) {
+    return new Set<LayerId>(specific);
+  }
+  return new Set<LayerId>(["hifld-transmission", "usda-wildfire", "epa-ejscreen"]);
 }
 
 function summarizeConflicts(result: AnalysisResult): string {

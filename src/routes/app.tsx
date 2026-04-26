@@ -58,6 +58,16 @@ function acresToRadiusMeters(acres: number) {
   return Math.sqrt((a * 4046.8564224) / Math.PI);
 }
 
+function parseShapeKind(value: string | null): ShapeKind | null {
+  if (value === "circle" || value === "square" || value === "hexagon") return value;
+  return null;
+}
+
+function parseProjectKind(value: string | null): ProjectKind | null {
+  if (value === "solar" || value === "battery" || value === "grid-tied") return value;
+  return null;
+}
+
 function summarizeAvoided(before: Conflict[] | null, after: Conflict[] | null): string | null {
   if (!before?.length) return null;
   const afterLabels = new Set((after ?? []).map((c) => c.label));
@@ -90,6 +100,38 @@ function RegridApp() {
     const email = getSessionEmail();
     setSessionEmail(email);
     if (email) setActivity(getUserActivity(email));
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const lngRaw = params.get("lng");
+    const latRaw = params.get("lat");
+    if (!lngRaw || !latRaw) return;
+
+    const lng = Number(lngRaw);
+    const lat = Number(latRaw);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+
+    const sharedAcreage = Number(params.get("acres") ?? "");
+    const nextAcreage =
+      Number.isFinite(sharedAcreage) && sharedAcreage >= 10 && sharedAcreage <= 500
+        ? Math.round(sharedAcreage / 5) * 5
+        : 50;
+    const sharedTool = parseShapeKind(params.get("tool")) ?? "circle";
+    const sharedProject = parseProjectKind(params.get("project"));
+
+    if (sharedProject) setProjectKind(sharedProject);
+    setAcreage(nextAcreage);
+    setActiveTool(sharedTool);
+    setShape(
+      buildShape(
+        sharedTool,
+        clampLngLatToCalifornia([lng, lat]),
+        acresToRadiusMeters(nextAcreage),
+        `shape-${Date.now()}`,
+      ),
+    );
   }, []);
 
   const [enabledLayers, setEnabledLayers] = useState<Set<LayerId>>(
@@ -137,6 +179,43 @@ function RegridApp() {
     if (shape) return "Ready to run analysis or describe a new goal below";
     return "Describe a siting goal — e.g. lowest-risk solar site in Central Valley, CA";
   }, [copilotRunning, analysisState, result, shape]);
+
+  const handleShare = () => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams();
+    if (shape) {
+      params.set("lng", shape.center[0].toFixed(6));
+      params.set("lat", shape.center[1].toFixed(6));
+      params.set("acres", String(acreage));
+      params.set("tool", shape.kind);
+      params.set("project", projectKind);
+    }
+    const url = `${window.location.origin}/app${params.toString() ? `?${params.toString()}` : ""}`;
+    void navigator.clipboard.writeText(url).catch(() => {
+      /* no-op: clipboard may be blocked in some browsers */
+    });
+  };
+
+  const handleExport = () => {
+    if (typeof window === "undefined") return;
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      projectKind,
+      acreage,
+      enabledLayers: Array.from(enabledLayers),
+      shape,
+      result,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `regrid-export-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(href);
+  };
 
   const handleMapClick = (lngLat: [number, number]) => {
     if (copilotRunning || !activeTool) return;
@@ -324,7 +403,7 @@ function RegridApp() {
 
   return (
     <div className="regrid-workspace fixed inset-0 z-0 flex flex-col overflow-hidden bg-[#04080e]">
-      <WorkspaceHeader projectKind={projectKind} />
+      <WorkspaceHeader projectKind={projectKind} onShare={handleShare} onExport={handleExport} />
       <div className="relative min-h-0 min-w-0 flex-1">
         <div className="absolute inset-0 z-0">
           <MapCanvas

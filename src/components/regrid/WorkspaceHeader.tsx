@@ -13,9 +13,11 @@ export function workspaceProjectLabel(kind: ProjectKind): string {
 
 interface WorkspaceHeaderProps {
   projectKind: ProjectKind;
+  onShare?: () => void;
+  onExport?: () => void;
 }
 
-export function WorkspaceHeader({ projectKind }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({ projectKind, onShare, onExport }: WorkspaceHeaderProps) {
   return (
     <header className="relative z-40 flex h-[48px] shrink-0 items-center justify-between px-5 bg-gradient-to-b from-black/55 to-transparent">
       <motion.div
@@ -51,12 +53,14 @@ export function WorkspaceHeader({ projectKind }: WorkspaceHeaderProps) {
         </div>
         <button
           type="button"
+          onClick={onShare}
           className="map-text text-[12.5px] font-medium text-white/30 transition duration-150 hover:text-white/65"
         >
           Share
         </button>
         <button
           type="button"
+          onClick={onExport}
           className="map-text text-[12.5px] font-medium text-white/30 transition duration-150 hover:text-white/65"
         >
           Export

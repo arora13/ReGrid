@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, useInView } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 import { ArrowRight, Shield, Zap, Cpu, MapPin, BarChart3, Sparkles } from "lucide-react";
@@ -7,7 +7,11 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "ReGrid · Spatial Intelligence for Clean Energy Siting" },
-      { name: "description", content: "Know every conflict before you break ground. ReGrid scores any energy site against federal datasets in seconds." },
+      {
+        name: "description",
+        content:
+          "Know every conflict before you break ground. ReGrid scores any energy site against federal datasets in seconds.",
+      },
     ],
   }),
   component: LandingPage,
@@ -30,11 +34,17 @@ function CountUp({ target, suffix = "" }: { target: number; suffix?: string }) {
     };
     requestAnimationFrame(tick);
   }, [inView, target]);
-  return <span ref={ref}>{val}{suffix}</span>;
+  return (
+    <span ref={ref}>
+      {val}
+      {suffix}
+    </span>
+  );
 }
 
 // ─── Score mockup (hero visual) ─────────────────────────────────────────────
 function ScoreMockup() {
+  const navigate = useNavigate();
   const conflicts = [
     { label: "Wildfire risk zone", weight: 32, color: "#fb923c", pct: 91 },
     { label: "EJScreen disadvantaged", weight: 28, color: "#f472b6", pct: 80 },
@@ -53,7 +63,9 @@ function ScoreMockup() {
         <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-amber-400/10 blur-2xl" />
 
         <div className="relative p-5">
-          <p className="font-mono text-[9px] tracking-[0.3em] text-white/25 uppercase">Siting Risk</p>
+          <p className="font-mono text-[9px] tracking-[0.3em] text-white/25 uppercase">
+            Siting Risk
+          </p>
           <div className="mt-1 flex items-end gap-1.5">
             <span
               className="font-serif text-[72px] font-normal leading-none tabular-nums"
@@ -71,7 +83,9 @@ function ScoreMockup() {
               <li key={c.label}>
                 <div className="flex items-center justify-between">
                   <span className="text-[12px] font-medium text-white/60">{c.label}</span>
-                  <span className="font-mono text-[11px] font-semibold" style={{ color: c.color }}>+{c.weight}</span>
+                  <span className="font-mono text-[11px] font-semibold" style={{ color: c.color }}>
+                    +{c.weight}
+                  </span>
                 </div>
                 <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-white/[0.06]">
                   <motion.div
@@ -87,11 +101,17 @@ function ScoreMockup() {
           </ul>
 
           <div className="mt-4 border-t border-white/[0.06] pt-3">
-            <p className="font-mono text-[9px] tracking-[0.25em] text-white/20 uppercase">Recommendation</p>
+            <p className="font-mono text-[9px] tracking-[0.25em] text-white/20 uppercase">
+              Recommendation
+            </p>
             <p className="mt-1 text-[11px] italic leading-relaxed text-white/35">
               Move 4.2 km northeast — score drops to 31.
             </p>
-            <button className="mt-1.5 text-[11px] font-medium text-white/40 hover:text-white/70 transition">
+            <button
+              type="button"
+              onClick={() => void navigate({ to: "/app" })}
+              className="mt-1.5 text-[11px] font-medium text-white/40 transition hover:text-white/70"
+            >
               Apply suggestion →
             </button>
           </div>
@@ -105,7 +125,9 @@ function ScoreMockup() {
         className="absolute -bottom-6 -left-12 w-[168px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#060e1b]/90 p-3.5 shadow-[0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur-xl"
       >
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400/30 to-transparent" />
-        <p className="font-mono text-[8.5px] tracking-[0.28em] text-white/20 uppercase">Active layers</p>
+        <p className="font-mono text-[8.5px] tracking-[0.28em] text-white/20 uppercase">
+          Active layers
+        </p>
         <ul className="mt-2.5 space-y-1.5">
           {[
             ["Wildfire zones", "#fb923c", true],
@@ -122,7 +144,9 @@ function ScoreMockup() {
                   boxShadow: on ? `0 0 5px ${color}88` : undefined,
                 }}
               />
-              <span className={`text-[10px] ${on ? "text-white/50" : "text-white/18"}`}>{name as string}</span>
+              <span className={`text-[10px] ${on ? "text-white/50" : "text-white/18"}`}>
+                {name as string}
+              </span>
             </li>
           ))}
         </ul>
@@ -160,7 +184,9 @@ function Nav() {
         </div>
 
         <div className="flex items-center gap-4">
-          <span className="hidden text-[12px] text-white/25 sm:block">Spatial Intelligence · Beta</span>
+          <span className="hidden text-[12px] text-white/25 sm:block">
+            Spatial Intelligence · Beta
+          </span>
           <Link
             to="/app"
             className="group flex items-center gap-2 rounded-lg border border-white/12 bg-white/[0.05] px-4 py-2 text-[12.5px] font-medium text-white/65 transition duration-200 hover:border-white/22 hover:bg-white/[0.1] hover:text-white"
@@ -187,7 +213,8 @@ function Hero() {
         <div
           className="absolute inset-0 opacity-[0.02]"
           style={{
-            backgroundImage: "linear-gradient(rgba(255,255,255,1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,1) 1px,transparent 1px)",
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,1) 1px,transparent 1px)",
             backgroundSize: "56px 56px",
           }}
         />
@@ -223,9 +250,9 @@ function Hero() {
             transition={{ duration: 0.65, delay: 0.2 }}
             className="mt-7 max-w-lg text-[clamp(15px,1.6vw,17px)] font-light leading-relaxed text-white/58"
           >
-            ReGrid scores any potential solar, wind, or battery site from 0–100 against
-            federal transmission corridors, wildfire risk, and environmental equity
-            datasets — in seconds, before you sign a lease.
+            ReGrid scores any potential solar, wind, or battery site from 0–100 against federal
+            transmission corridors, wildfire risk, and environmental equity datasets — in seconds,
+            before you sign a lease.
           </motion.p>
 
           <motion.div
@@ -241,7 +268,9 @@ function Hero() {
               Use the Tool
               <ArrowRight className="h-4 w-4 transition duration-200 group-hover:translate-x-0.5" />
             </Link>
-            <span className="text-[11.5px] text-white/38">Free · No account required · Runs in browser</span>
+            <span className="text-[11.5px] text-white/38">
+              Free · No account required · Runs in browser
+            </span>
           </motion.div>
 
           {/* Social proof mini-strip */}
@@ -283,7 +312,9 @@ function Hero() {
         className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
       >
         <div className="h-6 w-px bg-gradient-to-b from-white/20 to-transparent" />
-        <span className="font-mono text-[8.5px] tracking-[0.3em] text-white/15 uppercase">Scroll</span>
+        <span className="font-mono text-[8.5px] tracking-[0.3em] text-white/15 uppercase">
+          Scroll
+        </span>
       </motion.div>
     </section>
   );
@@ -306,7 +337,10 @@ function DataStrip() {
     <div className="border-y border-white/[0.06] py-4 overflow-hidden">
       <div className="flex animate-marquee gap-12 whitespace-nowrap">
         {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((item, i) => (
-          <span key={i} className="flex items-center gap-3 font-mono text-[10px] tracking-[0.2em] text-white/18 uppercase">
+          <span
+            key={i}
+            className="flex items-center gap-3 font-mono text-[10px] tracking-[0.2em] text-white/18 uppercase"
+          >
             <span className="h-1 w-1 rounded-full bg-white/15" />
             {item}
           </span>
@@ -368,9 +402,8 @@ function ScoreShowcase() {
           transition={{ duration: 0.6, delay: 0.5 }}
           className="mx-auto mt-4 max-w-md text-[14px] font-light leading-relaxed text-white/45"
         >
-          Drop a footprint on the map. Within seconds, ReGrid returns a composite risk
-          score weighted across every active federal dataset — and tells you exactly
-          what's driving it.
+          Drop a footprint on the map. Within seconds, ReGrid returns a composite risk score
+          weighted across every active federal dataset — and tells you exactly what's driving it.
         </motion.p>
       </div>
     </section>
@@ -450,13 +483,25 @@ function Features() {
                 className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl border"
                 style={{ borderColor: `${f.accent}25`, backgroundColor: `${f.accent}10` }}
               >
-                <f.icon className="h-4.5 w-4.5" style={{ color: f.accent, opacity: 0.8 }} strokeWidth={1.5} />
+                <f.icon
+                  className="h-4.5 w-4.5"
+                  style={{ color: f.accent, opacity: 0.8 }}
+                  strokeWidth={1.5}
+                />
               </div>
-              <p className="font-mono text-[9px] tracking-[0.22em] text-white/25 uppercase">{f.tag}</p>
-              <h3 className="mt-2 text-[15px] font-semibold leading-snug text-white/85">{f.headline}</h3>
-              <p className="mt-3 text-[12.5px] font-light leading-relaxed text-white/50">{f.body}</p>
+              <p className="font-mono text-[9px] tracking-[0.22em] text-white/25 uppercase">
+                {f.tag}
+              </p>
+              <h3 className="mt-2 text-[15px] font-semibold leading-snug text-white/85">
+                {f.headline}
+              </h3>
+              <p className="mt-3 text-[12.5px] font-light leading-relaxed text-white/50">
+                {f.body}
+              </p>
               <div className="mt-6 flex items-baseline gap-2">
-                <span className="font-serif text-[22px]" style={{ color: f.accent, opacity: 0.7 }}>{f.stat}</span>
+                <span className="font-serif text-[22px]" style={{ color: f.accent, opacity: 0.7 }}>
+                  {f.stat}
+                </span>
                 <span className="text-[11px] text-white/22">{f.statLabel}</span>
               </div>
             </motion.div>
@@ -469,9 +514,24 @@ function Features() {
 
 // ─── How it works ───────────────────────────────────────────────────────────
 const STEPS = [
-  { n: "01", icon: MapPin, title: "Drop a pin", body: "Click anywhere on California or type a location into the AI copilot. Choose your site shape — circle, square, or hex — and set the acreage." },
-  { n: "02", icon: BarChart3, title: "Get your score", body: "ReGrid instantly runs your footprint against 5 federal datasets and returns a weighted 0–100 risk score with every conflict itemized and ranked." },
-  { n: "03", icon: Cpu, title: "Optimize with AI", body: "Ask the copilot to find a better site, or hit Optimize. The AI scans a 30 km grid to find the lowest-risk alternative and moves your footprint there." },
+  {
+    n: "01",
+    icon: MapPin,
+    title: "Drop a pin",
+    body: "Click anywhere on California or type a location into the AI copilot. Choose your site shape — circle, square, or hex — and set the acreage.",
+  },
+  {
+    n: "02",
+    icon: BarChart3,
+    title: "Get your score",
+    body: "ReGrid instantly runs your footprint against 5 federal datasets and returns a weighted 0–100 risk score with every conflict itemized and ranked.",
+  },
+  {
+    n: "03",
+    icon: Cpu,
+    title: "Optimize with AI",
+    body: "Ask the copilot to find a better site, or hit Optimize. The AI scans a 30 km grid to find the lowest-risk alternative and moves your footprint there.",
+  },
 ];
 
 function HowItWorks() {
@@ -619,8 +679,8 @@ function Footer() {
     <footer className="border-t border-white/[0.05] px-6 py-6 sm:px-10">
       <div className="mx-auto flex max-w-6xl items-center justify-between">
         <span className="text-[11px] text-white/14">
-          <span className="font-light italic">Re</span><span className="font-bold">Grid</span>
-          {" "}· Clean Energy Siting Intelligence
+          <span className="font-light italic">Re</span>
+          <span className="font-bold">Grid</span> · Clean Energy Siting Intelligence
         </span>
         <span className="font-mono text-[9px] tracking-wider text-white/10 uppercase">Beta</span>
       </div>
