@@ -59,8 +59,8 @@ export function RiskScoreHUD({
 }: RiskScoreHUDProps) {
   const score = result?.score ?? null;
   const meta = scoreMeta(score);
-  const conflicts = useMemo(() => result?.conflicts?.slice(0, 5) ?? [], [result]);
-  const activeCount = conflicts.length;
+  const conflicts = useMemo(() => result?.conflicts ?? [], [result]);
+  const activeCount = result?.conflicts?.length ?? 0;
   const busy = analysisState === "analyzing" || analysisState === "relocating";
 
   const recommendation = useMemo(() => {
