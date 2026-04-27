@@ -86,12 +86,13 @@ export function RiskScoreHUD({
       initial={{ opacity: 0, x: 12 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="pointer-events-auto absolute right-0 top-0 bottom-0 z-20 flex w-[min(340px,calc(100vw-3rem))] flex-col justify-center pr-6 sm:pr-8"
+      className="pointer-events-auto absolute right-0 top-0 bottom-0 z-20 flex min-h-0 w-[min(340px,calc(100vw-3rem))] flex-col pr-6 sm:pr-8"
     >
       {/* Top gradient fade */}
       <div className="pointer-events-none absolute inset-y-0 right-0 w-full bg-gradient-to-l from-black/60 via-black/20 to-transparent" />
 
-      <div className="relative text-right">
+      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]">
+        <div className="relative flex min-h-full flex-col items-end justify-center py-10 pb-40 text-right">
         {/* ── Score section ─────────────────────────────────── */}
         <AnimatePresence mode="wait">
           {busy ? (
@@ -281,6 +282,7 @@ export function RiskScoreHUD({
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
     </motion.aside>
   );
