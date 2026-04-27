@@ -193,9 +193,9 @@ function ResultView({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="flex h-full flex-col"
+      className="flex min-h-0 flex-1 flex-col"
     >
-      <div className="flex flex-col items-center px-6 pt-6 pb-4">
+      <div className="shrink-0 flex flex-col items-center px-6 pt-6 pb-4">
         <RiskDial score={result.score} color={color} glowClass={glowClass} />
         <div
           className="mt-4 rounded-full border px-3 py-1 font-mono text-[10px] tracking-[0.3em] uppercase"
@@ -205,7 +205,7 @@ function ResultView({
         </div>
       </div>
 
-      <div className="border-t border-white/[0.06] px-5 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain border-t border-white/[0.06] px-5 py-4 [-webkit-overflow-scrolling:touch]">
         <p className="mb-3 font-mono text-[10px] tracking-[0.25em] text-muted-foreground uppercase">
           Detected Conflicts · {result.conflicts.length}
         </p>
@@ -225,7 +225,7 @@ function ResultView({
         </div>
       </div>
 
-      <div className="mt-auto border-t border-white/[0.06] p-5">
+      <div className="shrink-0 border-t border-white/[0.06] p-5">
         <button
           onClick={onRelocate}
           className="group flex w-full items-center justify-center gap-2 rounded-xl border border-primary/50 bg-gradient-to-r from-primary/15 to-primary/25 px-4 py-3 text-sm font-semibold text-primary transition-all hover:from-primary/25 hover:to-primary/40 glow-emerald"
