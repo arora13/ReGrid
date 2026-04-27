@@ -24,14 +24,14 @@ export function RiskPanel({
       initial={{ x: 40, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="glass-strong pointer-events-auto absolute top-28 right-8 bottom-72 z-20 flex w-[340px] flex-col rounded-2xl"
+      className="glass-strong pointer-events-auto absolute top-28 right-8 bottom-72 z-20 flex min-h-0 w-[340px] flex-col rounded-2xl"
     >
       <div className="border-b border-white/[0.06] px-4 py-3">
         <p className="font-mono text-[10px] tracking-[0.25em] text-primary/80 uppercase">Analysis</p>
         <h2 className="mt-0.5 text-base font-semibold tracking-tight">Conflict risk</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]">
         <AnimatePresence mode="wait">
           {state === "idle" && (
             <IdleView key="idle" hasShape={hasShape} onAnalyze={onAnalyze} />
