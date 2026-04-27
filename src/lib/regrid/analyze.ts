@@ -260,7 +260,7 @@ export function analyzeShape(
 
   return {
     score: Math.min(100, Math.round(score)),
-    conflicts: Array.from(dedup.values()).slice(0, 5),
+    conflicts: Array.from(dedup.values()).slice(0, 12),
   };
 }
 
