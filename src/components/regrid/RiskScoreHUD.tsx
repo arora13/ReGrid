@@ -92,7 +92,7 @@ export function RiskScoreHUD({
       <div className="pointer-events-none absolute inset-y-0 right-0 w-full bg-gradient-to-l from-black/60 via-black/20 to-transparent" />
 
       <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]">
-        <div className="relative flex min-h-full flex-col items-end justify-center py-10 pb-40 text-right">
+        <div className="relative flex min-h-full w-full max-w-full flex-col items-end justify-center py-10 pb-40 text-right">
         {/* ── Score section ─────────────────────────────────── */}
         <AnimatePresence mode="wait">
           {busy ? (
